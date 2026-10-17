@@ -1,0 +1,44 @@
+[mod]
+id      = "0009-tx-machines"
+title   = "TX machines: the Machinedrum TX-8/TX-9 kicks and snares on the analog voices, plus the BD TEST probe"
+
+# Off in the default build; `make tx9-only` builds stock + this mod alone, `make tx9`
+# the SMP CUT build plus this mod.
+enabled = false
+
+# re-only | built | hardware-verified | retracted
+status  = "built"
+
+summary = """
+Four new machines from the Machinedrum user machines in MACHINEDRUM_USR, and one
+hidden factory machine:
+
+  BD track  BD TX-9 (slot 36)  LEV PTC DEC TUN DPT ACC WAV TRA
+            BD TX-8 (slot 35)  LEV PTC DEC SIG ACC HLD WAV TRA
+            BD TEST (slot 44)  the analog core's raw controls (probe)
+  SD track  SD TX-9 (slot 37)  LEV PTC DEC TON SNP ACC BND DTU
+            SD TX-8 (slot 38)  LEV PTC DEC TON SNP ACC DET TRA
+
+Each TX machine runs a stock machine (BD CLASSIC for the kicks, SD CLASSIC for the
+snares) with a parameter set computed every audio block from the TX machine's
+curves: pitch sweeps, bends and the 808 sigh go to the stock tune parameter, decays
+go to the stock envelopes through tables matched to the TX machines' decay times,
+ACC scales the level. The curves come from the plugins' own tables and code and,
+for decay times and levels, from running the plugins in a DSP56300 emulator
+(tools/tx_measure/); tools/gen_tx_tables.py turns both into tables.inc.
+
+Hardware-tested on MK1 (BD TX-9 version 1, 2026-10-10): BD TX-9 and BD TEST
+selectable, all BD TX-9 knobs worked except DEC, which drove an envelope the
+hardware does not follow per block. DEC now drives BD CLASSIC's own decay.
+See design.md.
+"""
+
+[sources]
+stub = "stub.s"
+
+[requires]
+symbols = [
+  "bd_classic_machine",
+  "sd_classic_machine",
+  "MACHINE_VOICE_STATE",
+]

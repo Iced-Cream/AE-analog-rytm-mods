@@ -1,0 +1,31 @@
+[mod]
+id      = "0012-duck"
+title   = "DUCK: a track-keyed ducker on the voices' analog VCAs, on a page behind COMP"
+
+# Not in the default builds: `make fxduck` builds it with the FX build.
+enabled = false
+
+# re-only | built | hardware-verified | retracted
+status  = "built"
+
+summary = """
+Sidechain-style pumping without the analog compressor (whose detector cannot be
+re-routed): every audio block the stock code writes each voice's VCA L/R control
+words (level x pan, linear in amplitude) into the control frame; this mod runs right
+after it and scales the words of every voice but the key's by a gain that dips when
+the key track's voice hits.
+
+FX track, AMP (COMP) pressed twice: the DUCK page - SRC (OFF, or the key track),
+DEP, ATK, HLD, REL. Global settings, held in RAM (SRC OFF at power-up). The key is
+the source voice's own audio as the codec captured it; the delay and reverb returns
+are not ducked.
+
+The page hooks are shared with 0010's page: 0012's detours are the first link of a
+chain and pass everything else to 0010, or to stock without it (build.py chains).
+"""
+
+# Its code sits where 0002 lives (cave2, after 0011's); the FX build has no 0002.
+excludes = ["0002-euclid-accents"]
+
+[sources]
+stub = "stub.s"

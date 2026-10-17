@@ -1,0 +1,2831 @@
+# Single source of truth for every scarce resource a mod can claim - Analog Rytm MK1,
+# OS 1.74 (ported from 1.73, 2026-10-17: addresses are 1.74's, the notes' prose still
+# cites 1.73 - docs/PORT-1.74.md). Same rules as the MKII registry this was ported from
+# (the MKII rytm-mods project's registry/allocations.toml): tools/layout.py
+# asserts that no two claims overlap and that every claim sits inside its pool;
+# tools/build.py checks every `expect` against the stock bytes before patching.
+#
+# Every address below is an MK1 address. Each patch and detour also records the MKII
+# address it was ported from (mk2 = ...), and its `expect` bytes were matched in the
+# MK1 image - for the six-byte detours, the same bytes as on MKII.
+#
+# owner = the mod directory name, or "reserved:<reason>".
+
+[meta]
+target = "OS1.74"
+device = "Analog Rytm MK1"
+
+# ---------------------------------------------------------------- the image
+#
+# From the MK1 startup code (reset entry 0x40000592):
+#   0x40000506  copies 0x402a3000..0x402aa9f0 to SRAM 0x80000000..0x800079f0 and
+#               0x402aa9f0..0x402b1c24 (the image's end) to 0x80008000.
+#   0x4000055c  zeroes 0x402a3000..0x427a6310: __bss_start = 0x402a3000.
+# So, as on MKII, everything at or above 0x402a3000 is initialiser data and then .bss,
+# and NOTHING below 0x402a3000 is .bss.
+#
+# THE ONE MK1-ONLY TRAP: 0x4028c708..0x402a1b24 is the bootstrap, embedded in MAIN
+# OS. At every boot 0x400005aa compares its version word (0x4028c708) with the one in
+# flash (0x1fff8) and, if it is newer, 0x4011a738 erases the bootstrap sectors and
+# writes 0x4028c710..0x402a1b24 into them. A mod byte in that range could one day be
+# written into the recovery path. No pool may touch it, and tools/verify.py asserts
+# its hash is stock in every build.
+
+# ---------------------------------------------------------------------- pools
+
+[[pool]]
+name   = "cave2"
+start  = 0x402a2780
+end    = 0x402a3000          # exclusive; 2176 B
+status = "probably-verified"
+note   = """
+The MK1 twin of MKII's cave2, which ran 0003 and 0004 on hardware: alignment
+padding between the end of the read-only data and the first SRAM load image.
+
+Evidence, all static, on this image:
+- 0x402a277c..0x402a3000 is zeros (the run continues into the SRAM image, whose
+  first bytes are zero too). The pool starts 4 bytes in to keep claims aligned.
+- Just below is the C++ static-constructor table: count 130 at 0x402a2570, entries
+  from 0x402a2574, so it ends exactly at 0x402a277c. (MKII: 146 entries.)
+- No 32-bit word at any even offset in the image points into 0x402a2700..0x402a3000.
+- 0x402a3000 is where both the SRAM copy (0x40000506) and the .bss clear
+  (0x4000055c) start; the gap is below both and nothing else writes it.
+
+Why "probably-verified" and not "candidate" before any MK1 hardware run: the static
+case is complete, not an argument. The two ways a zero run can be live are closed by
+the startup code itself - it is below __bss_start, so nothing clears or reuses it,
+and it is above the last static constructor, so nothing reads it as a table - and
+nothing in the image points into it. It is also the exact twin of MKII's cave2,
+which ran 0003 and 0004 through normal use with a canary that stayed intact.
+What is NOT yet done is an MK1 session: the first 0002/0003 image is that run
+(code here that got overwritten would crash visibly, not fail quietly). Record the
+result here and change the status to "verified" after it.
+"""
+
+[[pool]]
+name   = "cave"
+start  = 0x402a1b90
+end    = 0x402a2000          # exclusive; 1232 B
+status = "probably-verified"
+note   = """
+The MK1 twin of MKII's cave1 (padding at the end of the code, before the UTF-16 USB
+strings). On MK1 what ends just before it is the EMBEDDED BOOTSTRAP IMAGE, whose last
+byte is 0x402a1b23 (the flasher's loop bound, cmpil #0x402a1b24 at 0x4011a81e).
+
+Evidence: 0x402a1b24..0x402a2002 is zeros; the only references into
+0x402a1b00..0x402a2010 are that loop bound and two pointers to the string table at
+0x402a2000. The pool keeps 12 bytes clear of the image's end on purpose.
+
+Promoted to "probably-verified" on the same static case as cave2 (2026-09-27, for
+0008): below __bss_start, so nothing clears or reuses it at run time; nothing points
+into it; and it is outside the bootstrap flasher's range, whose end is the exclusive
+bound 0x402a1b24 - the embedded image's own hash is checked by build and verify, so
+a claim here that spilled into the image could not be built. The MKII twin (cave1)
+was proven on hardware. Not yet run on an MK1: 0008's first flash is that run.
+"""
+
+[[pool]]
+name   = "cave3"
+start  = 0x4024db6c
+end    = 0x4024df6c          # exclusive; 1024 B
+status = "probably-verified"
+note   = """
+The MK1 twin of MKII's cave3 (0x40289ab8, 1024 B between two float tables, which ran
+0003 on MKII hardware). Same shape here: 1024 B of zeros, bounded by referenced
+table starts - the nearest references are 0x4024d508 below and 0x4024df0c (the next
+table's start) above; nothing points inside. The same residual doubt as on MKII:
+the table before it starts at 0x4024d508, so if that table ran on for 1540 B and
+simply decayed to zero, the run would be live data that reads as 0.
+
+The residual doubt is closed on MK1 (2026-09-27): the table before the run is 385
+words starting at 0x4024d508 whose LAST word, 0x4024db08, is 0x48908ad9 (about 0.57
+in Q31) - a table that ends on a large value, not one decaying into the run. So the
+run is padding. Promoted to "probably-verified" with cave2's static argument (below
+__bss_start, unreferenced) plus the MKII twin's hardware canary. It is written at
+run time by 0008 (filter state), so if it were live data the filter would misbehave
+audibly rather than silently.
+"""
+
+
+# --------------------------------------------------------------------- claims
+#
+# The shared runtime (0000) sits in cave2; 0011 and 0012 claim cave2 too (their
+# blocks below), 0010 takes `cave` and cave3, 0009 its own dead-code pools.
+
+[[cave]]
+owner = "0000-shared"
+addr  = 0x402a2d38
+size  = 0xec
+note  = "The shared runtime: amount and dial-stop tables, decimal formatter, LCG draw, sound plumbing, FUNC test. MKII: 0x402ccebc in cave1."
+
+
+# ------------------------------------------------------- 0012-duck
+#
+# DUCK: a track-keyed ducker on the voices' VCA words, and its page (page 12) behind
+# COMP. Code, settings and state in cave2 after 0011's code; cave2's 0002 claim
+# overlaps, hence 0012 excludes 0002. The four page hooks are shared with 0010: these
+# detours are the first link of each chain (chain_pos -1), and pass everything else
+# on to 0010's gate, or to their own stock path when 0010 is not in the build.
+
+[[cave]]
+owner   = "0012-duck"
+addr    = 0x402a28e0
+size    = 0x458
+section = ".text"
+note    = "duck_gate, the four page gates, the COMP view's page list, the DUCK page, settings, state and strings."
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x40119e10
+size    = 4
+expect  = "40102960"       # the audio interrupt's jsr 0x40102960 (vca_frame), operand
+from_symbol = "duck_gate"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x400c743e
+size    = 2
+expect  = "7201"       # moveq #1,%d1 - the COMP view's page count
+replace = "7202"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x400c7444
+size    = 4
+expect  = "401af564"       # the one-entry list holding page 10
+from_symbol = "duck_pages"
+
+# page_info answers page 12.
+[[detour]]
+owner  = "0012-duck"
+addr   = 0x400f87a2
+size   = 6
+expect = "720a202f0004"
+entry  = "pi_gate"
+chain_pos   = -1
+chain_next  = "CHAIN_PI"
+chain_stock = "pi_stock"
+
+# The dials: page_get_value's entry.
+[[detour]]
+owner  = "0012-duck"
+addr   = 0x400381a0
+size   = 6
+expect = "4feffff448d7040c"
+entry  = "get_gate"
+chain_pos   = -1
+chain_next  = "CHAIN_GET"
+chain_stock = "get_stock"
+
+# The knobs: param_apply_delta past its prologue.
+[[detour]]
+owner  = "0012-duck"
+addr   = 0x400376e4
+size   = 6
+expect = "77832f2a0074"
+entry  = "delta_gate"
+chain_pos   = -1
+chain_next  = "CHAIN_DELTA"
+chain_stock = "delta_stock"
+
+# The popup text: param_value_text past its argument loads.
+[[detour]]
+owner  = "0012-duck"
+addr   = 0x400a5974
+size   = 6
+expect = "242f0020262f0024"
+entry  = "text_gate"
+chain_pos   = -1
+chain_next  = "CHAIN_TEXT"
+chain_stock = "text_stock"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e1dc
+size    = 4
+expect  = "00000000"       # id 7: max
+replace = "00000c00"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e1f8
+size    = 4
+expect  = "40208974"       # id 7: long name, was "Error"
+from_symbol = "str_src_l"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e1fc
+size    = 4
+expect  = "40208be0"       # id 7: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e200
+size    = 4
+expect  = "401ff27d"       # id 7: short name, was "ERR"
+from_symbol = "str_src"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e210
+size    = 4
+expect  = "00000100"       # id 8: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e22c
+size    = 4
+expect  = "401ff5be"       # id 8: long name, was "Solo"
+from_symbol = "str_dep_l"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e230
+size    = 4
+expect  = "40208be0"       # id 8: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e234
+size    = 4
+expect  = "401ff27d"       # id 8: short name, was "ERR"
+from_symbol = "str_dep"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e244
+size    = 4
+expect  = "00000100"       # id 9: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e260
+size    = 4
+expect  = "40221862"       # id 9: long name, was "Mute"
+from_symbol = "str_atk_l"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e264
+size    = 4
+expect  = "40208be0"       # id 9: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e268
+size    = 4
+expect  = "401ff27d"       # id 9: short name, was "ERR"
+from_symbol = "str_atk"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e348
+size    = 4
+expect  = "00000000"       # id 14: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e364
+size    = 4
+expect  = "40208974"       # id 14: long name, was "Error"
+from_symbol = "str_hld_l"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e368
+size    = 4
+expect  = "40208be0"       # id 14: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e36c
+size    = 4
+expect  = "401ff27d"       # id 14: short name, was "ERR"
+from_symbol = "str_hld"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e37c
+size    = 4
+expect  = "00000c00"       # id 15: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e398
+size    = 4
+expect  = "401ff5c3"       # id 15: long name, was "Active Track"
+from_symbol = "str_rel_l"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e39c
+size    = 4
+expect  = "40208be0"       # id 15: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0012-duck"
+addr    = 0x4018e3a0
+size    = 4
+expect  = "401ff27d"       # id 15: short name, was "ERR"
+from_symbol = "str_rel"
+
+# ------------------------------------------------------- 0011-cpu-probe
+#
+# The CPU probe (a measuring build, `make fxprobe`). Code in the tail of cave6 (after
+# 0009's .m37) and at the start of cave2, which 0002 uses (0011 excludes it: the FX
+# build has no 0002); variables in DRAM at 0x4a8a8000, past 0010's delay lines,
+# cleared by the probe at start.
+
+[[cave]]
+owner   = "0011-cpu-probe"
+addr    = 0x401103dc
+size    = 0xc8
+section = ".text"
+note    = "The audio interrupt's entry and exit hooks, the idle loop."
+
+[[cave]]
+owner   = "0011-cpu-probe"
+addr    = 0x402a2780
+size    = 0x158
+section = ".tab"
+note    = "The three label getters and their formatting."
+
+# The audio interrupt (vector 191) at its entry: lea -156(sp); movem.l d0-fp,(sp).
+[[detour]]
+owner  = "0011-cpu-probe"
+addr   = 0x40118984
+size   = 6
+expect = "4fefff6448d77fff"
+entry  = "isr_enter"
+
+# Its one exit: movem.l (sp),d0-fp; lea 156(sp),sp; then rte, which the stub re-emits.
+[[detour]]
+owner  = "0011-cpu-probe"
+addr   = 0x4011a16c
+size   = 6
+expect = "4cd77fff4fef009c"
+entry  = "isr_exit"
+rejoin = "none"
+
+[[patch]]
+owner   = "0011-cpu-probe"
+addr    = 0x400f9ecc
+size    = 4
+expect  = "400a0eaa"       # main()'s last call before its bra.s . spin -> idle_entry
+from_symbol = "idle_entry"
+
+# The PERF CHANNEL label getter: pea "PERF CHANNEL", replaced by the readout text.
+[[detour]]
+owner  = "0011-cpu-probe"
+addr   = 0x40045082
+size   = 6
+expect = "487940208587"
+entry  = "lbl_perf"
+reemit = false
+
+# The AUTO CHANNEL label getter: pea "AUTO CHANNEL", replaced by the readout text.
+[[detour]]
+owner  = "0011-cpu-probe"
+addr   = 0x400450aa
+size   = 6
+expect = "487940208594"
+entry  = "lbl_auto"
+reemit = false
+
+# The PROG CH IN CH label getter: pea "PROG CH IN CH", replaced by the readout text.
+[[detour]]
+owner  = "0011-cpu-probe"
+addr   = 0x400450d2
+size   = 6
+expect = "4879402085a1"
+entry  = "lbl_prog"
+reemit = false
+
+# ------------------------------------------------------- 0010-fx-sends
+#
+# A chorus and a comb as two more send effects, and a second AMP page (page 11) with
+# each track's two sends and the effects' settings. Code in `cave`, data, strings and
+# state in `cave3` - the pools 0004 and 0008 use, which it excludes (all three keep
+# their settings in the sound's free word). Delay lines and buffers in DRAM the stock
+# FX never touch (0x4a8a0000..), cleared by the mod before use. re/fx-engine.md.
+
+[[cave]]
+owner   = "0010-fx-sends"
+addr    = 0x402a1b90
+size    = 0x470
+section = ".text"
+note    = "The page_info / get / delta / text gates, the FX and return hooks, the bus mixer, chorus, comb and helpers."
+
+[[cave]]
+owner   = "0010-fx-sends"
+addr    = 0x4024db6c
+size    = 0x400
+section = ".tab"
+note    = "The AMP view's page list, the FX SENDS descriptor, the knob ids, the global settings, the comb's period table, the state and the strings."
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x400c7290
+size    = 2
+expect  = "7201"       # moveq #1,%d1 - the AMP view's page count
+replace = "7202"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x400c7296
+size    = 4
+expect  = "401af578"       # the one-entry list holding page 6
+from_symbol = "fx_pages"
+
+# page_info answers page 11; every other id goes to stock.
+[[detour]]
+owner  = "0010-fx-sends"
+addr   = 0x400f87a2
+size   = 6
+expect = "720a202f0004"
+entry  = "page_info_gate"
+
+# The dials: page_get_value's entry.
+[[detour]]
+owner  = "0010-fx-sends"
+addr   = 0x400381a0
+size   = 6
+expect = "4feffff448d7040c"
+entry  = "get_gate"
+
+# The knobs: param_apply_delta past its prologue (0003's gate rejoins here).
+[[detour]]
+owner  = "0010-fx-sends"
+addr   = 0x400376e4
+size   = 6
+expect = "77832f2a0074"
+entry  = "delta_gate"
+
+# The popup text: param_value_text past its argument loads.
+[[detour]]
+owner  = "0010-fx-sends"
+addr   = 0x400a5974
+size   = 6
+expect = "242f0020262f0024"
+entry  = "text_gate"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x40118a8a
+size    = 4
+expect  = "40107610"       # jsr 0x40107610, the FX block
+from_symbol = "fx_gate"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x40119f24
+size    = 4
+expect  = "40107610"       # jsr 0x40107610, the FX block
+from_symbol = "fx_gate"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x40118a62
+size    = 4
+expect  = "40107f8c"       # jsr 0x40107f8c, the return output
+from_symbol = "ret_gate"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x40119efc
+size    = 4
+expect  = "40107f8c"       # jsr 0x40107f8c, the return output
+from_symbol = "ret_gate"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e09c
+size    = 4
+expect  = "ffffffff"       # id 1: container index
+replace = "00000000"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e0a4
+size    = 4
+expect  = "00000000"       # id 1: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e0c0
+size    = 4
+expect  = "40208974"       # id 1: long name, was "Error"
+from_symbol = "str_chr_l"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e0c4
+size    = 4
+expect  = "40208be0"       # id 1: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e0c8
+size    = 4
+expect  = "401ff27d"       # id 1: short name, was "ERR"
+from_symbol = "str_chr"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e0d8
+size    = 4
+expect  = "00000000"       # id 2: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e0f4
+size    = 4
+expect  = "40208974"       # id 2: long name, was "Error"
+from_symbol = "str_pre_l"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e0f8
+size    = 4
+expect  = "40208be0"       # id 2: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e0fc
+size    = 4
+expect  = "401ff27d"       # id 2: short name, was "ERR"
+from_symbol = "str_pre"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e10c
+size    = 4
+expect  = "00000000"       # id 3: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e128
+size    = 4
+expect  = "40208974"       # id 3: long name, was "Error"
+from_symbol = "str_spd_l"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e12c
+size    = 4
+expect  = "40208be0"       # id 3: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e130
+size    = 4
+expect  = "401ff27d"       # id 3: short name, was "ERR"
+from_symbol = "str_spd"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e140
+size    = 4
+expect  = "00000000"       # id 4: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e15c
+size    = 4
+expect  = "40208974"       # id 4: long name, was "Error"
+from_symbol = "str_dep_l"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e160
+size    = 4
+expect  = "40208be0"       # id 4: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e164
+size    = 4
+expect  = "401ff27d"       # id 4: short name, was "ERR"
+from_symbol = "str_dep"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e174
+size    = 4
+expect  = "00000000"       # id 5: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e190
+size    = 4
+expect  = "40208974"       # id 5: long name, was "Error"
+from_symbol = "str_wid_l"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e194
+size    = 4
+expect  = "40208be0"       # id 5: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e198
+size    = 4
+expect  = "401ff27d"       # id 5: short name, was "ERR"
+from_symbol = "str_wid"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e2ac
+size    = 4
+expect  = "00000000"       # id 11: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e2c8
+size    = 4
+expect  = "40208974"       # id 11: long name, was "Error"
+from_symbol = "str_fdb_l"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e2cc
+size    = 4
+expect  = "40208be0"       # id 11: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e2d0
+size    = 4
+expect  = "401ff27d"       # id 11: short name, was "ERR"
+from_symbol = "str_fdb"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e2e0
+size    = 4
+expect  = "00000000"       # id 12: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e2fc
+size    = 4
+expect  = "40208974"       # id 12: long name, was "Error"
+from_symbol = "str_hpf_l"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e300
+size    = 4
+expect  = "40208be0"       # id 12: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e304
+size    = 4
+expect  = "401ff27d"       # id 12: short name, was "ERR"
+from_symbol = "str_hpf"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e314
+size    = 4
+expect  = "00000000"       # id 13: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e330
+size    = 4
+expect  = "40208974"       # id 13: long name, was "Error"
+from_symbol = "str_vol_l"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e334
+size    = 4
+expect  = "40208be0"       # id 13: group name, was ""
+from_symbol = "str_group"
+
+[[patch]]
+owner   = "0010-fx-sends"
+addr    = 0x4018e338
+size    = 4
+expect  = "401ff27d"       # id 13: short name, was "ERR"
+from_symbol = "str_vol"
+
+# ------------------------------------------------------- 0009-tx-machines
+#
+# Nine pools, all dead code (cave12, BT IMPROVED's routine, added for BD TX-9 DIGI,
+# whose machine_fn[34] is pointed at DISABLE): cave4 is the stock SD/RS/CY/CB TEST machine routines
+# (their four machine_fn entries are pointed at DISABLE by the patches below), and
+# cave5..cave11 are the routines of hidden machines 35, 37, 38, 39, 40, 41 and 42; the
+# machine_fn entries of 35, 37..40 and 42 point at the new machines that now live
+# there, 41's at DISABLE (its routine holds the names). (Cave11's only other "hits" in
+# a scan of every even-aligned long are 0x40110000-ish rows of the bitmap font data at
+# 0x4026b1xx..0x4026f9xx, not pointers; no instruction outside it names an address in
+# it.)
+
+[[pool]]
+name   = "cave4"
+start  = 0x401164b0
+end    = 0x40116c8a          # exclusive; 2010 B
+stock  = "code"
+expect_sha256 = "dbd3363a93ea3d428d722dabf217b6da4305c0e7b57808e44ee8af287a90bbc3"
+status = "probably-verified"
+note   = """
+Four whole machine routines, back to back: SD TEST 0x401164b0, RS TEST 0x40116634,
+CY TEST 0x401167dc, CB TEST 0x40116ad8, each ending in `jmp 0x40114e86` (CB TEST's
+at 0x40116c84). The end bound is the next routine, 0x40116c8a, which the audio
+interrupt calls (0x4011871c, 0x4011881a) and which stays untouched.
+
+Reachability, all static (2026-10-10): the only references into the range from
+outside it are the machine_fn entries 0x402544e4, 0x402544e8, 0x402544fc and
+0x40254500 (every even-aligned long in the image and every operand in the
+disassembly were scanned); branches inside stay inside. Those machines are never
+offered (machine_voice_mask 0, checked by both set-machine paths and the audio
+interrupt), and 0009 repoints the four entries at DISABLE so that even a kit
+received over SysEx naming one cannot run this code. Anything else claiming cave4
+must carry those four patches too.
+"""
+
+[[pool]]
+name   = "cave5"
+start  = 0x40108b90
+end    = 0x401090a0          # exclusive; 1296 B
+stock  = "code"
+expect_sha256 = "f6b674577e66774069410bbf4e59df5d01aeb2af9f955287af7b750cc5dd8b42"
+status = "probably-verified"
+note   = """
+The routine of hidden machine 35 (BD HARD 2), from its entry to the next routine
+(BD ACOUSTIC 0x401090a0). The only reference into the range is its own machine_fn entry
+0x402544bc (same scan as cave4), which 0009 points at the machine it puts here.
+Machine 35 was never offered on MK1 (mask 0) before 0009.
+"""
+
+[[pool]]
+name   = "cave6"
+start  = 0x40110084
+end    = 0x40110514          # exclusive; 1168 B
+stock  = "code"
+expect_sha256 = "6bd82450748e32e17871b988d6c2f5aa2d300b7513d0bed7ba54c441bb3b73e1"
+status = "probably-verified"
+note   = """
+The routine of hidden machine 37 (SD HARD 2), from its entry to the next routine
+(SD ACOUSTIC 0x40110514). The only reference into the range is its own machine_fn entry
+0x402544c4 (same scan as cave4), which 0009 points at the machine it puts here.
+Machine 37 was never offered on MK1 (mask 0) before 0009.
+"""
+
+[[pool]]
+name   = "cave7"
+start  = 0x4010f79c
+end    = 0x4010fc18          # exclusive; 1148 B
+stock  = "code"
+expect_sha256 = "e5763757b7b126bd5f507d7c26309ad4669d74c0cf69f170e244762c1e701997"
+status = "probably-verified"
+note   = """
+The routine of hidden machine 38 (SD CLASSIC 2), from its entry to the next routine
+(RS FM 2 0x4010fc18). The only reference into the range is its own machine_fn entry
+0x402544c8 (same scan as cave4), which 0009 points at the machine it puts here.
+Machine 38 was never offered on MK1 (mask 0) before 0009.
+"""
+
+[[pool]]
+name   = "cave8"
+start  = 0x4010e9f8
+end    = 0x4010edc0          # exclusive; 968 B
+stock  = "code"
+expect_sha256 = "aad2bbdaa5eaaf6607cc1eaf1c512481222efd3d628abddd2bd3570ed2905af3"
+status = "probably-verified"
+note   = """
+The routine of hidden machine 39 (RS HARD 2), from its entry to the next routine
+(RS CLASSIC 0x4010edc0). The only reference into the range is its own machine_fn entry
+0x402544cc (same scan as cave4), which 0009 points at the machine it puts here.
+Machine 39 was never offered on MK1 (mask 0) before 0009.
+"""
+
+[[pool]]
+name   = "cave9"
+start  = 0x4010e63c
+end    = 0x4010e9f8          # exclusive; 956 B
+stock  = "code"
+expect_sha256 = "4a64cd5a7692d529e1450fbd35279eac58ca98755209e2ab129f894f1434a5e9"
+status = "probably-verified"
+note   = """
+The routine of hidden machine 40 (RS CLASSIC 2), from its entry to the next routine
+(RS HARD 2 0x4010e9f8). The only reference into the range is its own machine_fn entry
+0x402544d0 (same scan as cave4), which 0009 points at the machine it puts here.
+Machine 40 was never offered on MK1 (mask 0) before 0009.
+"""
+
+[[pool]]
+name   = "cave10"
+start  = 0x40108538
+end    = 0x40108b90          # exclusive; 1624 B
+stock  = "code"
+expect_sha256 = "ff2aa4c1c40d33abacd0bf9ce32943ed56426aa43d01e9746725591b0c6ce44a"
+status = "probably-verified"
+note   = """
+The routine of hidden machine 41 (BD FM 2), from its entry to the next routine
+(BD HARD 2 0x40108b90). The only reference into the range is its own machine_fn entry
+0x402544d4 (same scan as cave4), which 0009 points at the machine it puts here.
+Machine 41 was never offered on MK1 (mask 0) before 0009.
+"""
+
+[[pool]]
+name   = "cave11"
+start  = 0x4010fc18
+end    = 0x40110084          # exclusive; 1132 B
+stock  = "code"
+expect_sha256 = "cdb5a2f6649201f6d2910c1fbc70cfa7a752a466813f17fba1692b8794b2e2ea"
+status = "probably-verified"
+note   = """
+The routine of hidden machine 42 (RS FM 2), from its entry to the next routine
+(SD HARD 2 0x40110084). The only reference into the range is its own machine_fn entry
+0x402544d8 (same scan as cave4), which 0009 points at the machine it puts here.
+Machine 42 was never offered on MK1 (mask 0) before 0009.
+"""
+
+[[pool]]
+name   = "cave12"
+start  = 0x401144b0
+end    = 0x4011476c          # exclusive; 700 B
+stock  = "code"
+expect_sha256 = "c7b837ac569be8d9da3a5285af510ab71dc04c34fbc66c609f2fa115c6a1ef7b"
+status = "probably-verified"
+note   = """
+The routine of hidden machine 34 (BT IMPROVED), from its entry to the next routine
+(BT CLASSIC 0x4011476c). The only reference into the range is its own machine_fn entry
+0x402544b8 (same scan as cave4), which 0009 points at the machine it puts here.
+Machine 34 was never offered on MK1 (mask 0) before 0009.
+"""
+
+[[cave]]
+owner   = "0009-tx-machines"
+addr    = 0x401164b0
+size    = 0x7d0
+section = ".text"
+note    = "Shared helpers (interpolation, the log2 pitch sweep, note-on test), BD TX-9 and its tables, BD TX-9's per-voice state."
+
+[[cave]]
+owner   = "0009-tx-machines"
+addr    = 0x40108b90
+size    = 0x500
+section = ".m35"
+note    = "Tables shared by BT TX-8 and BD TX-9 DIGI (BD TX-8 itself is dropped; machine_fn[35] -> DISABLE)."
+
+[[cave]]
+owner   = "0009-tx-machines"
+addr    = 0x40110084
+size    = 0x358
+section = ".m37"
+note    = "SD TX-9: tables, machine, per-voice state."
+
+[[cave]]
+owner   = "0009-tx-machines"
+addr    = 0x4010f79c
+size    = 0x42c
+section = ".m38"
+note    = "SD TX-8: tables, machine, its matched noise routine and state."
+
+[[cave]]
+owner   = "0009-tx-machines"
+addr    = 0x4010e9f8
+size    = 0x3c4
+section = ".m39"
+note    = "XT TX-9: tables, machine, per-voice state."
+
+[[cave]]
+owner   = "0009-tx-machines"
+addr    = 0x4010e63c
+size    = 0x380
+section = ".m40"
+note    = "XT TX-8: tables, machine, per-voice state."
+
+[[cave]]
+owner   = "0009-tx-machines"
+addr    = 0x40108538
+size    = 0x638
+section = ".m41"
+note    = "All the machine and parameter names. Machine 41 (BD FM 2) itself is pointed at DISABLE."
+
+[[cave]]
+owner   = "0009-tx-machines"
+addr    = 0x4010fc18
+size    = 0x434
+section = ".m42"
+note    = "BT TX-8: tables, machine, per-voice state, its names; BD TX-9 DIGI's phase table."
+
+[[cave]]
+owner   = "0009-tx-machines"
+addr    = 0x401144b0
+size    = 0x2a8
+section = ".m34"
+note    = "BD TX-9 DIGI's code (its tables and state sit in .m35, .m39, .m41, .m42 and .m38). Machine 34 (BT IMPROVED) itself is pointed at DISABLE."
+
+# Machines 36 and 41 offered on the BD voice (bit 0; BD TEST 44 hidden again, BD TX-8 35 dropped), 37 and 38 on the SD voice
+# (bit 2, category 1 like the stock SD machines), 39 and 40 on the LT and MT/HT voices
+# (bits 3 and 5, category -1 like XT CLASSIC), 42 on the BT voice (bit 1, category 4
+# like BT CLASSIC). Machine table entries, names and parameter records follow; records
+# keep their index and storage.
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d911
+size    = 1
+expect  = "00"       # machine 36: voice mask
+replace = "01"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d913
+size    = 1
+expect  = "00"       # machine 37: voice mask
+replace = "04"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d915
+size    = 1
+expect  = "00"       # machine 38: voice mask
+replace = "04"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d917
+size    = 1
+expect  = "00"       # machine 39: voice mask
+replace = "28"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d919
+size    = 1
+expect  = "00"       # machine 40: voice mask
+replace = "28"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d91d
+size    = 1
+expect  = "00"       # machine 42: voice mask
+replace = "02"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d91b
+size    = 1
+expect  = "00"       # machine 41: voice mask
+replace = "01"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d912
+size    = 1
+expect  = "00"       # machine 37: category SD
+replace = "01"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d914
+size    = 1
+expect  = "00"       # machine 38: category SD
+replace = "01"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d91c
+size    = 1
+expect  = "00"       # machine 42: category -1 (offered like XT TX-9; category 4 is not listed)
+replace = "ff"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d916
+size    = 1
+expect  = "00"       # machine 39: category -1, as XT CLASSIC
+replace = "ff"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d918
+size    = 1
+expect  = "00"       # machine 40: category -1, as XT CLASSIC
+replace = "ff"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544c0
+size    = 4
+expect  = "40107ff4"       # machine_fn[36]
+from_symbol = "tx9bd_machine"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544c4
+size    = 4
+expect  = "40110084"       # machine_fn[37]
+from_symbol = "tx9sd_machine"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544c8
+size    = 4
+expect  = "4010f79c"       # machine_fn[38]
+from_symbol = "tx8sd_machine"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544cc
+size    = 4
+expect  = "4010e9f8"       # machine_fn[39]
+from_symbol = "tx9xt_machine"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544d0
+size    = 4
+expect  = "4010e63c"       # machine_fn[40]
+from_symbol = "tx8xt_machine"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544d8
+size    = 4
+expect  = "4010fc18"       # machine_fn[42]
+from_symbol = "bt8_machine"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544d4
+size    = 4
+expect  = "40108538"       # machine_fn[41]
+from_symbol = "tx9d_machine"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544e4
+size    = 4
+expect  = "401164b0"       # machine_fn[45] -> DISABLE; its old code is cave4
+replace = "4010d11c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544e8
+size    = 4
+expect  = "40116634"       # machine_fn[46] -> DISABLE; its old code is cave4
+replace = "4010d11c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544fc
+size    = 4
+expect  = "401167dc"       # machine_fn[51] -> DISABLE; its old code is cave4
+replace = "4010d11c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40254500
+size    = 4
+expect  = "40116ad8"       # machine_fn[52] -> DISABLE; its old code is cave4
+replace = "4010d11c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544bc
+size    = 4
+expect  = "40108b90"       # machine_fn[35] -> DISABLE; BD TX-8 dropped (BT TX-8 replaces it), cave5 keeps tables
+replace = "4010d11c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x402544b8
+size    = 4
+expect  = "401144b0"       # machine_fn[34] -> DISABLE; its old code is cave12
+replace = "4010d11c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d810
+size    = 4
+expect  = "401ff4c4"       # machine 36 name "BD CLASSIC 2"
+from_symbol = "str_bdt9"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d814
+size    = 4
+expect  = "401ff4d1"       # machine 36 short "B2CL"
+from_symbol = "str_bdt9s"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d818
+size    = 4
+expect  = "401ff4d6"       # machine 37 name "SD HARD 2"
+from_symbol = "str_sdt9"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d81c
+size    = 4
+expect  = "401ff4e0"       # machine 37 short "S2HD"
+from_symbol = "str_sdt9s"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d820
+size    = 4
+expect  = "401ff4e5"       # machine 38 name "SD CLASSIC 2"
+from_symbol = "str_sdt8"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d824
+size    = 4
+expect  = "401ff4f2"       # machine 38 short "S2CL"
+from_symbol = "str_sdt8s"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d828
+size    = 4
+expect  = "401ff4f7"       # machine 39 name "RS HARD 2"
+from_symbol = "str_xtt9"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d82c
+size    = 4
+expect  = "401ff501"       # machine 39 short "R2HD"
+from_symbol = "str_xtt9s"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d830
+size    = 4
+expect  = "401ff506"       # machine 40 name "RS CLASSIC 2"
+from_symbol = "str_xtt8"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d834
+size    = 4
+expect  = "401ff513"       # machine 40 short "R2CL"
+from_symbol = "str_xtt8s"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d840
+size    = 4
+expect  = "401ff525"       # machine 42 name "RS FM 2"
+from_symbol = "str_btt8"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d844
+size    = 4
+expect  = "401ff52d"       # machine 42 short "S2FM"
+from_symbol = "str_btt8s"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d838
+size    = 4
+expect  = "401ff518"       # machine 41 name "BD FM 2"
+from_symbol = "str_bd9d"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018d83c
+size    = 4
+expect  = "401ff520"       # machine 41 short "B2FM"
+from_symbol = "str_bd9ds"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192638
+size    = 4
+expect  = "401ffb49"       # id 343 (machine 36 idx 9): long "Level"
+from_symbol = "str_level"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019263c
+size    = 4
+expect  = "401ffda9"       # id 343: group "B2 CL"
+from_symbol = "str_bdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192640
+size    = 4
+expect  = "401ffd25"       # id 343: short "LEV"
+from_symbol = "str_lev"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401925ec
+size    = 4
+expect  = "00003400"       # id 342: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192604
+size    = 4
+expect  = "401ffcaa"       # id 342 (machine 36 idx 10): long "Tune"
+from_symbol = "str_pitch"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192608
+size    = 4
+expect  = "401ffda9"       # id 342: group "B2 CL"
+from_symbol = "str_bdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019260c
+size    = 4
+expect  = "401ff733"       # id 342: short "TUN"
+from_symbol = "str_ptc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192688
+size    = 4
+expect  = "00002000"       # id 345: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401926a0
+size    = 4
+expect  = "401ffb1b"       # id 345 (machine 36 idx 11): long "Decay Time"
+from_symbol = "str_decay"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401926a4
+size    = 4
+expect  = "401ffda9"       # id 345: group "B2 CL"
+from_symbol = "str_bdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401926a8
+size    = 4
+expect  = "4020afad"       # id 345: short "DEC"
+from_symbol = "str_dec"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192654
+size    = 4
+expect  = "00002000"       # id 344: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019266c
+size    = 4
+expect  = "401ff7da"       # id 344 (machine 36 idx 12): long "Hold Time"
+from_symbol = "str_swt"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192670
+size    = 4
+expect  = "401ffda9"       # id 344: group "B2 CL"
+from_symbol = "str_bdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192674
+size    = 4
+expect  = "401ff7e4"       # id 344: short "HLD"
+from_symbol = "str_tun"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401926d4
+size    = 4
+expect  = "401ffb09"       # id 346 (machine 36 idx 13): long "Sweep Time"
+from_symbol = "str_swd"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401926d8
+size    = 4
+expect  = "401ffda9"       # id 346: group "B2 CL"
+from_symbol = "str_bdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401926dc
+size    = 4
+expect  = "401ff9bd"       # id 346: short "SWT"
+from_symbol = "str_dpt"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401926f0
+size    = 4
+expect  = "00002a00"       # id 347: default
+replace = "00006000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192708
+size    = 4
+expect  = "401ff9e2"       # id 347 (machine 36 idx 14): long "Sweep Depth"
+from_symbol = "str_accent"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019270c
+size    = 4
+expect  = "401ffda9"       # id 347: group "B2 CL"
+from_symbol = "str_bdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192710
+size    = 4
+expect  = "401ff9ee"       # id 347: short "SWD"
+from_symbol = "str_acc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192724
+size    = 4
+expect  = "00000100"       # id 348: default
+replace = "00000000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019273c
+size    = 4
+expect  = "401ff846"       # id 348 (machine 36 idx 15): long "Waveform"
+from_symbol = "str_wave"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192740
+size    = 4
+expect  = "401ffda9"       # id 348: group "B2 CL"
+from_symbol = "str_bdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192744
+size    = 4
+expect  = "401ff84f"       # id 348: short "WAV"
+from_symbol = "str_wav"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192754
+size    = 4
+expect  = "00003700"       # id 349: max
+replace = "00007f00"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192758
+size    = 4
+expect  = "00001100"       # id 349: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192770
+size    = 4
+expect  = "401ff9f2"       # id 349 (machine 36 idx 16): long "Transient"
+from_symbol = "str_attack"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192774
+size    = 4
+expect  = "401ffda9"       # id 349: group "B2 CL"
+from_symbol = "str_bdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192778
+size    = 4
+expect  = "4020e251"       # id 349: short "TRA"
+from_symbol = "str_atk"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019280c
+size    = 4
+expect  = "401ffb49"       # id 352 (machine 37 idx 9): long "Level"
+from_symbol = "str_level"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192810
+size    = 4
+expect  = "401ff9fc"       # id 352: group "SD HD"
+from_symbol = "str_sdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192814
+size    = 4
+expect  = "401ffd25"       # id 352: short "LEV"
+from_symbol = "str_lev"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401928dc
+size    = 4
+expect  = "401ffcaa"       # id 356 (machine 37 idx 10): long "Tune"
+from_symbol = "str_pitch"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401928e0
+size    = 4
+expect  = "401ff9fc"       # id 356: group "SD HD"
+from_symbol = "str_sdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401928e4
+size    = 4
+expect  = "401ff733"       # id 356: short "TUN"
+from_symbol = "str_ptc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401927c0
+size    = 4
+expect  = "00004c00"       # id 351: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401927d8
+size    = 4
+expect  = "401ffb1b"       # id 351 (machine 37 idx 11): long "Decay Time"
+from_symbol = "str_decay"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401927dc
+size    = 4
+expect  = "401ff9fc"       # id 351: group "SD HD"
+from_symbol = "str_sdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401927e0
+size    = 4
+expect  = "4020afad"       # id 351: short "DEC"
+from_symbol = "str_dec"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019278c
+size    = 4
+expect  = "00007f00"       # id 350: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401927a4
+size    = 4
+expect  = "401ff9e2"       # id 350 (machine 37 idx 12): long "Sweep Depth"
+from_symbol = "str_tone"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401927a8
+size    = 4
+expect  = "401ff9fc"       # id 350: group "SD HD"
+from_symbol = "str_sdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401927ac
+size    = 4
+expect  = "401ff9ee"       # id 350: short "SWD"
+from_symbol = "str_ton"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192840
+size    = 4
+expect  = "401ff9d1"       # id 353 (machine 37 idx 13): long "Tick Level"
+from_symbol = "str_snappy"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192844
+size    = 4
+expect  = "401ff9fc"       # id 353: group "SD HD"
+from_symbol = "str_sdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192848
+size    = 4
+expect  = "40217d4a"       # id 353: short "TIC"
+from_symbol = "str_snp"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019285c
+size    = 4
+expect  = "00002000"       # id 354: default
+replace = "00006000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192874
+size    = 4
+expect  = "401ffa02"       # id 354 (machine 37 idx 14): long "Noise Decay"
+from_symbol = "str_accent"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192878
+size    = 4
+expect  = "401ff9fc"       # id 354: group "SD HD"
+from_symbol = "str_sdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019287c
+size    = 4
+expect  = "401ffa0e"       # id 354: short "NOD"
+from_symbol = "str_acc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401928a8
+size    = 4
+expect  = "401ffa12"       # id 355 (machine 37 idx 15): long "Noise Level"
+from_symbol = "str_bend"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401928ac
+size    = 4
+expect  = "401ff9fc"       # id 355: group "SD HD"
+from_symbol = "str_sdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401928b0
+size    = 4
+expect  = "4020d5e9"       # id 355: short "NOL"
+from_symbol = "str_bnd"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401928f8
+size    = 4
+expect  = "00002b00"       # id 357: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192910
+size    = 4
+expect  = "401ffb09"       # id 357 (machine 37 idx 16): long "Sweep Time"
+from_symbol = "str_detune"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192914
+size    = 4
+expect  = "401ff9fc"       # id 357: group "SD HD"
+from_symbol = "str_sdt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192918
+size    = 4
+expect  = "401ff9bd"       # id 357: short "SWT"
+from_symbol = "str_dtu"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b4c
+size    = 4
+expect  = "401ffb49"       # id 368 (machine 39 idx 9): long "Level"
+from_symbol = "str_level"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b50
+size    = 4
+expect  = "401ffdaf"       # id 368: group "R2 HD"
+from_symbol = "str_xtt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b54
+size    = 4
+expect  = "401ffd25"       # id 368: short "LEV"
+from_symbol = "str_lev"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c1c
+size    = 4
+expect  = "401ffcaa"       # id 372 (machine 39 idx 10): long "Tune"
+from_symbol = "str_pitch"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c20
+size    = 4
+expect  = "401ffdaf"       # id 372: group "R2 HD"
+from_symbol = "str_xtt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c24
+size    = 4
+expect  = "401ff733"       # id 372: short "TUN"
+from_symbol = "str_ptc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b00
+size    = 4
+expect  = "00003400"       # id 367: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b18
+size    = 4
+expect  = "401ffb1b"       # id 367 (machine 39 idx 11): long "Decay Time"
+from_symbol = "str_decay"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b1c
+size    = 4
+expect  = "401ffdaf"       # id 367: group "R2 HD"
+from_symbol = "str_xtt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b20
+size    = 4
+expect  = "4020afad"       # id 367: short "DEC"
+from_symbol = "str_dec"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ac8
+size    = 4
+expect  = "00007f00"       # id 366: max
+replace = "00000200"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192acc
+size    = 4
+expect  = "00007f00"       # id 366: default
+replace = "00000100"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ae4
+size    = 4
+expect  = "401ff9e2"       # id 366 (machine 39 idx 12): long "Sweep Depth"
+from_symbol = "str_type"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ae8
+size    = 4
+expect  = "401ffdaf"       # id 366: group "R2 HD"
+from_symbol = "str_xtt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192aec
+size    = 4
+expect  = "401ff9ee"       # id 366: short "SWD"
+from_symbol = "str_typ"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b68
+size    = 4
+expect  = "00003000"       # id 369: default
+replace = "00006000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b80
+size    = 4
+expect  = "401ff9d1"       # id 369 (machine 39 idx 13): long "Tick Level"
+from_symbol = "str_accent"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b84
+size    = 4
+expect  = "401ffdaf"       # id 369: group "R2 HD"
+from_symbol = "str_xtt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b88
+size    = 4
+expect  = "40217d4a"       # id 369: short "TIC"
+from_symbol = "str_acc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192b9c
+size    = 4
+expect  = "00000800"       # id 370: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192bb4
+size    = 4
+expect  = "401ffa12"       # id 370 (machine 39 idx 14): long "Noise Level"
+from_symbol = "str_bend"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192bb8
+size    = 4
+expect  = "401ffdaf"       # id 370: group "R2 HD"
+from_symbol = "str_xtt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192bbc
+size    = 4
+expect  = "4020d5e9"       # id 370: short "NOL"
+from_symbol = "str_bnd"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192be8
+size    = 4
+expect  = "401ff940"       # id 371 (machine 39 idx 15): long "Symmetry"
+from_symbol = "str_noise"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192bec
+size    = 4
+expect  = "401ffdaf"       # id 371: group "R2 HD"
+from_symbol = "str_xtt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192bf0
+size    = 4
+expect  = "401ff949"       # id 371: short "SYM"
+from_symbol = "str_noi"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c38
+size    = 4
+expect  = "00002200"       # id 373: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c50
+size    = 4
+expect  = "401ffb09"       # id 373 (machine 39 idx 16): long "Sweep Time"
+from_symbol = "str_ntone"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c54
+size    = 4
+expect  = "401ffdaf"       # id 373: group "R2 HD"
+from_symbol = "str_xtt9g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c58
+size    = 4
+expect  = "401ff9bd"       # id 373: short "SWT"
+from_symbol = "str_ton"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192d54
+size    = 4
+expect  = "401ffb49"       # id 378 (machine 40 idx 9): long "Level"
+from_symbol = "str_level"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192d58
+size    = 4
+expect  = "401ffdb5"       # id 378: group "R2 CL"
+from_symbol = "str_xtt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192d5c
+size    = 4
+expect  = "401ffd25"       # id 378: short "LEV"
+from_symbol = "str_lev"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192cec
+size    = 4
+expect  = "401ffa3c"       # id 376 (machine 40 idx 10): long "Tune Osc1"
+from_symbol = "str_pitch"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192cf0
+size    = 4
+expect  = "401ffdb5"       # id 376: group "R2 CL"
+from_symbol = "str_xtt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192cf4
+size    = 4
+expect  = "401ffa46"       # id 376: short "T1"
+from_symbol = "str_ptc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192cb8
+size    = 4
+expect  = "401ffb1b"       # id 375 (machine 40 idx 11): long "Decay Time"
+from_symbol = "str_decay"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192cbc
+size    = 4
+expect  = "401ffdb5"       # id 375: group "R2 CL"
+from_symbol = "str_xtt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192cc0
+size    = 4
+expect  = "4020afad"       # id 375: short "DEC"
+from_symbol = "str_dec"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c68
+size    = 4
+expect  = "00007f00"       # id 374: max
+replace = "00000200"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c6c
+size    = 4
+expect  = "00004000"       # id 374: default
+replace = "00000100"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c84
+size    = 4
+expect  = "401ffa24"       # id 374 (machine 40 idx 12): long "Osc Balance"
+from_symbol = "str_type"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c88
+size    = 4
+expect  = "401ffdb5"       # id 374: group "R2 CL"
+from_symbol = "str_xtt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192c8c
+size    = 4
+expect  = "402161d5"       # id 374: short "BAL"
+from_symbol = "str_typ"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192d20
+size    = 4
+expect  = "401ffa49"       # id 377 (machine 40 idx 13): long "Tune Osc2"
+from_symbol = "str_tune"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192d24
+size    = 4
+expect  = "401ffdb5"       # id 377: group "R2 CL"
+from_symbol = "str_xtt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192d28
+size    = 4
+expect  = "401ffa53"       # id 377: short "T2"
+from_symbol = "str_tun"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192dd8
+size    = 4
+expect  = "00004000"       # id 381: default
+replace = "00006000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192df0
+size    = 4
+expect  = "401ff940"       # id 381 (machine 40 idx 14): long "Symmetry"
+from_symbol = "str_accent"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192df4
+size    = 4
+expect  = "401ffdb5"       # id 381: group "R2 CL"
+from_symbol = "str_xtt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192df8
+size    = 4
+expect  = "401ff949"       # id 381: short "SYM"
+from_symbol = "str_acc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192da4
+size    = 4
+expect  = "00001000"       # id 380: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192dbc
+size    = 4
+expect  = "401ffa12"       # id 380 (machine 40 idx 15): long "Noise Level"
+from_symbol = "str_diode"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192dc0
+size    = 4
+expect  = "401ffdb5"       # id 380: group "R2 CL"
+from_symbol = "str_xtt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192dc4
+size    = 4
+expect  = "4020d5e9"       # id 380: short "NOL"
+from_symbol = "str_dio"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192d88
+size    = 4
+expect  = "401ff9d1"       # id 379 (machine 40 idx 16): long "Tick Level"
+from_symbol = "str_noise"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192d8c
+size    = 4
+expect  = "401ffdb5"       # id 379: group "R2 CL"
+from_symbol = "str_xtt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192d90
+size    = 4
+expect  = "40217d4a"       # id 379: short "TIC"
+from_symbol = "str_noi"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e58
+size    = 4
+expect  = "401ffb49"       # id 383 (machine 41 idx 9): long "Level"
+from_symbol = "str_level"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e5c
+size    = 4
+expect  = "401ffdbb"       # id 383: group "B2 FM"
+from_symbol = "str_bd9dg"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e60
+size    = 4
+expect  = "401ffd25"       # id 383: short "LEV"
+from_symbol = "str_lev"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e0c
+size    = 4
+expect  = "00003400"       # id 382: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e24
+size    = 4
+expect  = "401ffcaa"       # id 382 (machine 41 idx 10): long "Tune"
+from_symbol = "str_pitch"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e28
+size    = 4
+expect  = "401ffdbb"       # id 382: group "B2 FM"
+from_symbol = "str_bd9dg"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e2c
+size    = 4
+expect  = "401ff733"       # id 382: short "TUN"
+from_symbol = "str_ptc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ea8
+size    = 4
+expect  = "00002000"       # id 385: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ec0
+size    = 4
+expect  = "401ffb1b"       # id 385 (machine 41 idx 11): long "Decay Time"
+from_symbol = "str_decay"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ec4
+size    = 4
+expect  = "401ffdbb"       # id 385: group "B2 FM"
+from_symbol = "str_bd9dg"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ec8
+size    = 4
+expect  = "4020afad"       # id 385: short "DEC"
+from_symbol = "str_dec"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e74
+size    = 4
+expect  = "00002000"       # id 384: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e8c
+size    = 4
+expect  = "401ffaf8"       # id 384 (machine 41 idx 12): long "FM Amount"
+from_symbol = "str_swt"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e90
+size    = 4
+expect  = "401ffdbb"       # id 384: group "B2 FM"
+from_symbol = "str_bd9dg"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192e94
+size    = 4
+expect  = "401ffb02"       # id 384: short "FMA"
+from_symbol = "str_tun"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192edc
+size    = 4
+expect  = "00003000"       # id 386: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ef4
+size    = 4
+expect  = "401ffb09"       # id 386 (machine 41 idx 13): long "Sweep Time"
+from_symbol = "str_swd"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ef8
+size    = 4
+expect  = "401ffdbb"       # id 386: group "B2 FM"
+from_symbol = "str_bd9dg"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192efc
+size    = 4
+expect  = "401ff9bd"       # id 386: short "SWT"
+from_symbol = "str_dpt"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f10
+size    = 4
+expect  = "00002000"       # id 387: default
+replace = "00006000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f28
+size    = 4
+expect  = "401ffb06"       # id 387 (machine 41 idx 14): long "FM Sweep Time"
+from_symbol = "str_accent"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f2c
+size    = 4
+expect  = "401ffdbb"       # id 387: group "B2 FM"
+from_symbol = "str_bd9dg"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f30
+size    = 4
+expect  = "401ffb14"       # id 387: short "FMS"
+from_symbol = "str_acc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f40
+size    = 4
+expect  = "00007f00"       # id 388: max
+replace = "00000200"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f44
+size    = 4
+expect  = "00003000"       # id 388: default
+replace = "00000100"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f5c
+size    = 4
+expect  = "401ffb18"       # id 388 (machine 41 idx 15): long "FM Decay Time"
+from_symbol = "str_wave"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f60
+size    = 4
+expect  = "401ffdbb"       # id 388: group "B2 FM"
+from_symbol = "str_bd9dg"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f64
+size    = 4
+expect  = "401ffb26"       # id 388: short "FMD"
+from_symbol = "str_wav"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f78
+size    = 4
+expect  = "00002000"       # id 389: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f90
+size    = 4
+expect  = "401ffb2a"       # id 389 (machine 41 idx 16): long "FM Tune"
+from_symbol = "str_attack"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f94
+size    = 4
+expect  = "401ffdbb"       # id 389: group "B2 FM"
+from_symbol = "str_bd9dg"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192f98
+size    = 4
+expect  = "401ffb32"       # id 389: short "FMT"
+from_symbol = "str_atk"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193130
+size    = 4
+expect  = "401ffb49"       # id 397 (machine 42 idx 9): long "Level"
+from_symbol = "str_level"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193134
+size    = 4
+expect  = "401ffdc1"       # id 397: group "S2 FM"
+from_symbol = "str_btt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193138
+size    = 4
+expect  = "401ffd25"       # id 397: short "LEV"
+from_symbol = "str_lev"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192fac
+size    = 4
+expect  = "00003400"       # id 390: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192fc4
+size    = 4
+expect  = "401ffcaa"       # id 390 (machine 42 idx 10): long "Tune"
+from_symbol = "str_pitch"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192fc8
+size    = 4
+expect  = "401ffdc1"       # id 390: group "S2 FM"
+from_symbol = "str_btt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192fcc
+size    = 4
+expect  = "401ff733"       # id 390: short "TUN"
+from_symbol = "str_ptc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193060
+size    = 4
+expect  = "401ffb1b"       # id 393 (machine 42 idx 11): long "Decay Time"
+from_symbol = "str_decay"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193064
+size    = 4
+expect  = "401ffdc1"       # id 393: group "S2 FM"
+from_symbol = "str_btt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193068
+size    = 4
+expect  = "4020afad"       # id 393: short "DEC"
+from_symbol = "str_dec"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193014
+size    = 4
+expect  = "00005800"       # id 392: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019302c
+size    = 4
+expect  = "401ffb2a"       # id 392 (machine 42 idx 12): long "FM Tune"
+from_symbol = "str_sigh"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193030
+size    = 4
+expect  = "401ffdc1"       # id 392: group "S2 FM"
+from_symbol = "str_btt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193034
+size    = 4
+expect  = "401ffb32"       # id 392: short "FMT"
+from_symbol = "str_sig"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401930b0
+size    = 4
+expect  = "00004000"       # id 395: default
+replace = "00006000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401930c8
+size    = 4
+expect  = "401ffb18"       # id 395 (machine 42 idx 13): long "FM Decay Time"
+from_symbol = "str_accent"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401930cc
+size    = 4
+expect  = "401ffdc1"       # id 395: group "S2 FM"
+from_symbol = "str_btt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401930d0
+size    = 4
+expect  = "401ffb26"       # id 395: short "FMD"
+from_symbol = "str_acc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019307c
+size    = 4
+expect  = "00002000"       # id 394: default
+replace = "00000000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193094
+size    = 4
+expect  = "401ffa02"       # id 394 (machine 42 idx 14): long "Noise Decay"
+from_symbol = "str_hold"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193098
+size    = 4
+expect  = "401ffdc1"       # id 394: group "S2 FM"
+from_symbol = "str_btt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019309c
+size    = 4
+expect  = "401ffa0e"       # id 394: short "NOD"
+from_symbol = "str_hld"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401930e4
+size    = 4
+expect  = "00004000"       # id 396: default
+replace = "00000000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401930fc
+size    = 4
+expect  = "401ffa12"       # id 396 (machine 42 idx 15): long "Noise Level"
+from_symbol = "str_noise"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193100
+size    = 4
+expect  = "401ffdc1"       # id 396: group "S2 FM"
+from_symbol = "str_btt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193104
+size    = 4
+expect  = "4020d5e9"       # id 396: short "NOL"
+from_symbol = "str_noi"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192fe0
+size    = 4
+expect  = "00007f00"       # id 391: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ff8
+size    = 4
+expect  = "401ffaf8"       # id 391 (machine 42 idx 16): long "FM Amount"
+from_symbol = "str_attack"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ffc
+size    = 4
+expect  = "401ffdc1"       # id 391: group "S2 FM"
+from_symbol = "str_btt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40193000
+size    = 4
+expect  = "401ffb02"       # id 391: short "FMA"
+from_symbol = "str_atk"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ab0
+size    = 4
+expect  = "401ffb49"       # id 365 (machine 38 idx 9): long "Level"
+from_symbol = "str_level"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ab4
+size    = 4
+expect  = "401ffa1e"       # id 365: group "SD CL"
+from_symbol = "str_sdt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192ab8
+size    = 4
+expect  = "401ffd25"       # id 365: short "LEV"
+from_symbol = "str_lev"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019292c
+size    = 4
+expect  = "00003400"       # id 358: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192944
+size    = 4
+expect  = "401ffcaa"       # id 358 (machine 38 idx 10): long "Tune"
+from_symbol = "str_pitch"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192948
+size    = 4
+expect  = "401ffa1e"       # id 358: group "SD CL"
+from_symbol = "str_sdt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019294c
+size    = 4
+expect  = "401ff733"       # id 358: short "TUN"
+from_symbol = "str_ptc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401929c8
+size    = 4
+expect  = "00003000"       # id 361: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401929e0
+size    = 4
+expect  = "401ffb1b"       # id 361 (machine 38 idx 11): long "Decay Time"
+from_symbol = "str_decay"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401929e4
+size    = 4
+expect  = "401ffa1e"       # id 361: group "SD CL"
+from_symbol = "str_sdt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401929e8
+size    = 4
+expect  = "4020afad"       # id 361: short "DEC"
+from_symbol = "str_dec"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192994
+size    = 4
+expect  = "00003000"       # id 360: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401929ac
+size    = 4
+expect  = "401ffcb5"       # id 360 (machine 38 idx 12): long "Detune"
+from_symbol = "str_tone"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401929b0
+size    = 4
+expect  = "401ffa1e"       # id 360: group "SD CL"
+from_symbol = "str_sdt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401929b4
+size    = 4
+expect  = "4020aafd"       # id 360: short "DET"
+from_symbol = "str_ton"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a48
+size    = 4
+expect  = "401ff9c1"       # id 363 (machine 38 idx 13): long "Snap Amount"
+from_symbol = "str_snappy"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a4c
+size    = 4
+expect  = "401ffa1e"       # id 363: group "SD CL"
+from_symbol = "str_sdt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a50
+size    = 4
+expect  = "401ff9cd"       # id 363: short "SNP"
+from_symbol = "str_snp"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401929fc
+size    = 4
+expect  = "00004000"       # id 362: default
+replace = "00006000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a14
+size    = 4
+expect  = "401ffa02"       # id 362 (machine 38 idx 14): long "Noise Decay"
+from_symbol = "str_accent"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a18
+size    = 4
+expect  = "401ffa1e"       # id 362: group "SD CL"
+from_symbol = "str_sdt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a1c
+size    = 4
+expect  = "401ffa0e"       # id 362: short "NOD"
+from_symbol = "str_acc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a60
+size    = 4
+expect  = "00007f00"       # id 364: max
+replace = "00002000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a64
+size    = 4
+expect  = "00004000"       # id 364: default
+replace = "00000c00"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a7c
+size    = 4
+expect  = "401ffa12"       # id 364 (machine 38 idx 15): long "Noise Level"
+from_symbol = "str_detune"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a80
+size    = 4
+expect  = "401ffa1e"       # id 364: group "SD CL"
+from_symbol = "str_sdt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192a84
+size    = 4
+expect  = "4020d5e9"       # id 364: short "NOL"
+from_symbol = "str_det"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192960
+size    = 4
+expect  = "00002000"       # id 359: default
+replace = "00004000"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192978
+size    = 4
+expect  = "401ffa24"       # id 359 (machine 38 idx 16): long "Osc Balance"
+from_symbol = "str_trans"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4019297c
+size    = 4
+expect  = "401ffa1e"       # id 359: group "SD CL"
+from_symbol = "str_sdt8g"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40192980
+size    = 4
+expect  = "402161d5"       # id 359: short "BAL"
+from_symbol = "str_tra"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40183858
+size    = 4
+expect  = "416a6a2c"       # id 342: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40183cbe
+size    = 4
+expect  = "416a6a2c"       # id 356: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40183d5e
+size    = 4
+expect  = "416a6a2c"       # id 358: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40183db2
+size    = 4
+expect  = "416a6a2c"       # id 359: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401841c2
+size    = 4
+expect  = "416a6a2c"       # id 372: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40184306
+size    = 4
+expect  = "416a6a2c"       # id 376: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018435a
+size    = 4
+expect  = "416a6a2c"       # id 377: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40184492
+size    = 4
+expect  = "416a6a2c"       # id 381: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x4018471e
+size    = 4
+expect  = "416a6a2c"       # id 390: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401847c2
+size    = 4
+expect  = "416a6a2c"       # id 392: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401844e6
+size    = 4
+expect  = "416a6a2c"       # id 382: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401846d6
+size    = 4
+expect  = "416a6a2c"       # id 389: value display, centred -> plain
+replace = "416a6a4c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40183a7a
+size    = 4
+expect  = "401ba3c4"       # id 349: knob descriptor, stepped -> as id 341
+replace = "401ba3ec"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40183aa0
+size    = 4
+expect  = "416a658c"       # id 349: control, transient picture -> slider
+replace = "416a67bc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40183abc
+size    = 4
+expect  = "416a644c"       # id 349: control (+0x48), as id 341
+replace = "416a640c"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401846bc
+size    = 4
+expect  = "401ba34c"       # id 389: knob descriptor -> as id 341
+replace = "401ba3ec"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x401846e8
+size    = 4
+expect  = "416a682c"       # id 389: control, bipolar -> slider
+replace = "416a67bc"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40183fe6
+size    = 4
+expect  = "416a6a4c"       # id 366: value display -> LT/MT/HT
+from_symbol = "fmt_lmh"
+
+[[patch]]
+owner   = "0009-tx-machines"
+addr    = 0x40184266
+size    = 4
+expect  = "416a6a2c"       # id 374: value display -> LT/MT/HT
+from_symbol = "fmt_lmh"

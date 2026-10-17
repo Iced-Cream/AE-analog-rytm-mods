@@ -1,0 +1,30 @@
+[mod]
+id      = "0011-cpu-probe"
+title   = "CPU probe: processor load readouts in SETTINGS > MIDI CONFIG > CHANNELS"
+
+# Not in the default builds: `make fxprobe` builds it with the FX build.
+enabled = false
+
+# re-only | built | hardware-verified | retracted
+status  = "built"
+
+summary = """
+A measuring build. Three labels of SETTINGS > MIDI CONFIG > CHANNELS show the load
+instead of their names (the settings themselves are untouched):
+
+  PERF CHANNEL   CPU    time the processor was not idle: audio, sequencer, UI, all
+  AUTO CHANNEL   AUDIO  the audio interrupt's average share of the time
+  PROG CH IN CH  PEAK   the audio interrupt's largest share of a single block
+
+Each covers the time since it was last drawn. The audio figures time the audio
+interrupt from entry to exit with DMA timer 0 (A4 0004's method). CPU replaces
+main()'s final spin - the code that runs when nothing else wants the processor - with
+a loop that adds up its own uninterrupted time on the same timer. The difference
+CPU - AUDIO is what the sequencer, the screen and the card get.
+"""
+
+# Its label code sits where 0002 lives (cave2); the FX build has no 0002.
+excludes = ["0002-euclid-accents"]
+
+[sources]
+stub = "stub.s"

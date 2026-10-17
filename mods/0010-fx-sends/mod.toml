@@ -1,0 +1,32 @@
+[mod]
+id      = "0010-fx-sends"
+title   = "FX SENDS: a chorus send with the A4 chorus controls, on a second AMP page"
+
+enabled = false
+
+# re-only | built | hardware-verified | retracted
+status  = "built"
+
+# All three keep their settings in the sound's one free parameter word.
+excludes = ["0004-lfo-rnd", "0008-sample-cut"]
+
+summary = """
+Press AMP a second time for the FX SENDS page: CHR, each track's send to a stereo
+chorus (saved with the sound), and the chorus's settings in the Analog Four's terms -
+PRE, SPD, DEP, WID, FDB, HPF - plus the return's level. The settings are global
+(every track's page shows the same seven) and, in this version, held in RAM: they
+return to their defaults at power-up.
+
+The chorus runs on the ColdFire in the audio interrupt, after the stock delay and
+reverb, on the voices the codec captured: two interpolated taps on one line in DRAM's
+cached address, a one-pole high-pass on its input, the taps' average fed back. Its
+return joins the delay and reverb returns' PRE path (through the analog distortion
+and compressor) and follows the FX track's level, like the stock returns. Nothing
+runs while no track sends. v1's comb filter was dropped on 2026-10-15.
+"""
+
+[sources]
+stub = "stub.s"
+
+[requires]
+shared = true

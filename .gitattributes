@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.png binary
+*.syx binary
+*.bin binary

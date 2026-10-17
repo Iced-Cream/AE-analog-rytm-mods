@@ -1,0 +1,622 @@
+# Analog Rytm MK1 symbol map, OS 1.74 (every addr ported from 1.73 by tools/port_os.py,
+# 2026-10-17; the evidence texts still cite 1.73 addresses - docs/PORT-1.74.md).
+#
+# Addresses are virtual (load base 0x40000400); file_offset = addr - 0x40000400.
+# Every entry was located in THIS image and names the MKII 1.73 address it ports
+# (mk2 = ...), taken from the MKII rytm-mods project's
+# re/symbols.toml. The two builds are the same C++ code base:
+# code with no absolute addresses in it is byte-identical, shifted by a delta that
+# is constant over long runs (e.g. -0x1fec over all of trig_fire).
+#
+# status = "verified"  found in this image AND checked against what the MKII note
+#                      says the routine does (offsets, constants, callers)
+#          "mapped"    at the delta-predicted address and a routine starts there,
+#                      but its behaviour was not checked beyond that
+# evidence = how it was found / checked. Nothing here is "external".
+#
+# Entries for the original rytm1_mods set (euclid accents, velocity humanise, LFO
+# RND, SMP CUT) are kept: they document the firmware, even though those mods are not
+# in this repository.
+
+[meta]
+target        = "OS1.74"
+device        = "Analog Rytm MK1"
+base          = 0x40000400
+mainos_size   = 2824228
+mainos_sha256 = "6d021e22e8912cfc1ee84e619c35db0174455cbc42bf64dbec1f1d06a5ab811d"
+
+# The MK1 container carries ONE section (MAIN OS). There is no separate bootstrap
+# section: the bootstrap image rides INSIDE MAIN OS and the OS re-flashes it itself
+# when its version word is newer than the one in flash. See docs/HAZARDS.md.
+embedded_bootstrap_start  = 0x4028c768          # version words, then the image
+embedded_bootstrap_end    = 0x402a1b84          # exclusive; the flasher's loop bound
+embedded_bootstrap_sha256 = "de6b772035258ab79effcefd00907b2471ac6cca2f96f8453efb4cbc1738c3de"
+
+# Assembler target: ColdFire V4 with EMAC, no FPU (the image uses mvz/mvs, sats,
+# mov3q and mac/msac/movclr, and no FPU instructions in code).
+cpu = "5475"
+cpu_flags = ["-mno-float"]
+
+# ======================================================================== core
+[fn.project_singleton]
+addr = 0x40155738
+mk2 = 0x4017f83e
+status = "verified"
+evidence = "Most-called function whose result is pushed straight into another call (243 sites). Lazy construction: tstl 0x416c70c0, allocate 0x3d61c bytes. The MICRO TIME ALL draw path (string ref 0x40044680) calls it, then current_track_pattern, then is_key_held(0x80), exactly as MKII's microtiming_menu_draw."
+
+[fn.current_track_pattern]
+addr = 0x400ac354
+mk2 = 0x400af076
+status = "verified"
+evidence = "track_index_of(this + 48), then the active-pattern getter 0x400ac2b2, then pattern_track(pattern, track) - the MKII note's description, instruction for instruction."
+
+[fn.track_index_of]
+addr = 0x400b3a70
+mk2 = 0x400b68d2
+status = "verified"
+evidence = "Called 77 times as track_index_of(sel) right after the this+48 getter 0x400ab6ce; reads +8 of the selection's live storage."
+
+[fn.kit_track_sound]
+addr = 0x400a3d74
+mk2 = 0x400a675e
+status = "verified"
+evidence = "The only standalone routine that clamps the track to 0..11 and returns kit + 0x60 + track * 352 (40 callers; objdump prints lea a0@(60,d0:l) with the displacement in hex - it is 96, not 60)."
+
+[fn.kit_param_changed]
+addr = 0x40033438
+mk2 = 0x4003355c
+status = "verified"
+evidence = "(bank, track, id, value): writes at bank + 18 + sel*12194 + track*938 + id*2 with the selector at +0x11de4 (73188), sets bit id in +0x5f5c + sel*24388 + track*1876, sets the dirty byte at +4 and signals the lock at +8 - the MKII note's constants, all present. The entry is the clrb %d1 BEFORE the linkw (its two stock callers, 0x400a7182 and 0x400a726e, jsr here): d1 = 0 is the guard byte stored at fp-4."
+
+[fn.is_key_held]
+addr = 0x4008029a
+mk2 = 0x40081bbc
+status = "verified"
+evidence = "Key id -> RAM table 0x40a9de08 -> bit in the key bitmap 0x40a9e568 (same 0x760 spacing as MKII's 0x418d0be0/0x418d1340). Called with pea 0x80 at the MICRO TIME ALL title, as on MKII."
+
+[const.KEY_FUNC]
+value = 0x80
+status = "verified"
+evidence = "The id the MK1 MICRO TIME ALL title tests (0x4004465c), and the commonest constant argument to is_key_held (12 sites)."
+
+# ================================================================== sequencer
+[fn.trig_fire]
+addr = 0x40098a3c
+mk2 = 0x4009a9bc
+status = "verified"
+evidence = "delta -0x1fec, confirmed by four unique detour-site matches inside it (0x40098ade, 0x40098b86, 0x40098fb4, 0x40099014)."
+
+[data.trig_fire_flags_join]
+addr = 0x40098c0c
+mk2 = 0x4009ab8c
+status = "verified"
+evidence = "movel %d2,%d0 - the bras at 0x40098b8a (the grid arm 0002 detours) targets it."
+
+[data.trig_fire_euclid_flag_resume]
+addr = 0x40098b52
+mk2 = 0x4009aad2
+status = "verified"
+evidence = "eorl %d5,%d0 right after the moveb %a0@(714),%d0 / lea %a3@(0,%d7:l:2),%a1 pair 0002 re-emits."
+
+[data.trig_fire_vel_resume]
+addr = 0x40099026
+mk2 = 0x4009afa6
+status = "verified"
+evidence = "Just after movel %sp@(60),%d0 / addal %a2,%a3; next is movew %sp@(74),%a4@(6) then lsll #8,%d0 - the MKII layout."
+
+[fn.pattern_track_load]
+addr = 0x40008a0e
+mk2 = 0x40008b2e
+status = "mapped"
+evidence = "delta -0x120, prologue there; its euclid unpack (below) found by exact bytes."
+
+[data.pattern_track_load_euclid_resume]
+addr = 0x40008baa
+mk2 = 0x40008cca
+status = "verified"
+evidence = "moveb %d0,%a2@(714) after addl/subxl/negl (0002's displaced bytes, unique)."
+
+[fn.pattern_track_save]
+addr = 0x40008ca8
+mk2 = 0x40008dc8
+status = "mapped"
+evidence = "delta -0x120, prologue there."
+
+[data.pattern_track_save_euclid_resume]
+addr = 0x40008e48
+mk2 = 0x40008f68
+status = "verified"
+evidence = "andl %d2,%d1 after mvsb %a2@(714),%d0 / lsll #7 (unique), then the pack into storage +0x279 (moveb %d0,%a3@(633))."
+
+[fn.pattern_length]
+addr = 0x400bd5b8
+mk2 = 0x400c04b8
+status = "mapped"
+evidence = "delta -0x2f6c (the whole euclid block moved by that), routine start there."
+
+[fn.pattern_step_has_trig]
+addr = 0x400bd012
+mk2 = 0x400bff12
+status = "mapped"
+evidence = "delta -0x2f6c, routine start there."
+
+[fn.trig_flags_set]
+addr = 0x400bf516
+mk2 = 0x400c2416
+status = "mapped"
+evidence = "delta -0x2f6c, linkw routine start (step clamp follows)."
+
+[fn.vel_get_stock]
+addr = 0x400bce20
+mk2 = 0x400bfd20
+status = "verified"
+evidence = "Returns TrackPattern+0x2c1 through vtable[0x28]; called from the VEL get-by-id arm at 0x400a5ace and the live-play sites, as on MKII."
+
+[const.TRIG_BIT_ACCENT]
+value = 0x8
+status = "verified"
+evidence = "Same trig word as MKII: trig_fire's flag block is byte-identical."
+
+# =================================================================== euclidean
+[fn.euclid_generate]
+addr = 0x400bea98
+mk2 = 0x400c1998
+status = "mapped"
+evidence = "delta -0x2f6c, linkw routine start."
+
+[fn.euclid_bool_op_get]
+addr = 0x400be2b0
+mk2 = 0x400c11b0
+status = "verified"
+evidence = "Returns TrackPattern+0x2d0 (moveb %a0@(720)); the get-by-id arm at 0x400a5b66 calls it."
+
+[fn.euclid_bool_op_set]
+addr = 0x400be2e0
+mk2 = 0x400c11e0
+status = "verified"
+evidence = "Clamps to 0..3; the set-by-id arm at 0x400a6fc2 calls it."
+
+[fn.euclid_step_map_get]
+addr = 0x400be342
+mk2 = 0x400c1242
+status = "verified"
+evidence = "Clamps the step to 0..63 before the storage read."
+
+[fn.euclid_enabled_get]
+addr = 0x400bdf02
+mk2 = 0x400c0e02
+status = "verified"
+evidence = "Returns live +0x2ca (moveb %a0@(714))."
+
+[fn.euclid_enabled_set]
+addr = 0x400bdf32
+mk2 = 0x400c0e32
+status = "verified"
+evidence = "Clamps to 0..1, writes +0x2ca, notifies with the change-info word below."
+
+[data.EUCLID_CHANGE_INFO]
+addr = 0x401ae3c8
+mk2 = 0x401e0898
+status = "verified"
+evidence = "The word euclid_enabled_set stores in its stack local before vtable[0x10] (0x400bdf06)."
+
+[fn.euclid_bake]
+addr = 0x400c0d0e
+mk2 = 0x400c3c0e
+status = "verified"
+evidence = "lea %sp@(-120),%sp / moveml %d2-%d7/%a2-%fp (0002's expect, unique)."
+
+[data.euclid_bake_body]
+addr = 0x400c0d16
+mk2 = 0x400c3c16
+status = "verified"
+evidence = "moveal %sp@(124),%a2 right after the prologue."
+
+[fn.euclid_bool_op_format]
+addr = 0x400f8608
+mk2 = 0x400ff3da
+status = "verified"
+evidence = "arg >> 8, moveq #3 at +6 and +0x10, lea of the label table at +0x1a, jmp param_text_format."
+
+[data.euclid_bool_op_labels]
+addr = 0x401b9730
+mk2 = 0x401ec400
+status = "verified"
+evidence = "Four pointers: OR, XOR, AND, SUB."
+
+[data.LBL_OR]
+addr = 0x4020aff6
+status = "verified"
+evidence = "euclid_bool_op_labels[0]."
+
+[data.LBL_XOR]
+addr = 0x4022077e
+status = "verified"
+evidence = "euclid_bool_op_labels[1]."
+
+[data.LBL_AND]
+addr = 0x40210bd9
+status = "verified"
+evidence = "euclid_bool_op_labels[2]."
+
+[data.LBL_SUB]
+addr = 0x40209f8f
+status = "verified"
+evidence = "euclid_bool_op_labels[3]."
+
+[fn.boolop_icon_draw]
+addr = 0x400f86a0
+mk2 = 0x400ff472
+status = "verified"
+evidence = "Clamps the value to 0..3 (moveq #3 at +4 and +0x20) and indexes the icon set 0x416c6d90."
+
+[data.boolop_icon_set]
+addr = 0x416c6d90
+mk2 = 0x419f23c4
+status = "verified"
+evidence = "Pushed to bitmap_set_make at 0x4011cbdc with count 4, and to the icon draw."
+
+[fn.bitmap_ctor]
+addr = 0x4006e236
+mk2 = 0x4006f9c2
+status = "verified"
+evidence = "(obj, w, h, pixels, mask): +4 w, +8 h, +12 words per column, +16 pixels (pointer, not copied), +20 mask, vtable 0x401a4a78. The Bool Operator glyphs are built with w = 13, h = 11 on MK1 (MKII 17 x 12)."
+
+[fn.bitmap_set_make]
+addr = 0x4018669e
+mk2 = 0x401b7cd0
+status = "verified"
+evidence = "Called at 0x4011cbe2 as (set 0x416c6d90, first4, 4, arg4), right after the fourth Bool Operator glyph is built."
+
+# ===================================================================== params
+[fn.param_info]
+addr = 0x400f8784
+mk2 = 0x400ff556
+status = "verified"
+evidence = "Clamps id < 469 and returns 0x416a6aa4 + id * 88. NOTE the record is 88 bytes on MK1, 84 on MKII."
+
+[data.param_info_resume]
+addr = 0x400f878e
+mk2 = 0x400ff560
+status = "verified"
+evidence = "The scs that consumes the cmpi."
+
+[data.PARAM_INFO_BASE]
+addr = 0x416a6aa4
+mk2 = 0x419a4888
+status = "verified"
+evidence = "param_info's addil."
+
+[const.PARAM_INFO_STRIDE]
+value = 88
+status = "verified"
+evidence = "param_info's moveq #88 (MKII: 84)."
+
+[const.PARAM_ID_BOOL_OP]
+value = 467
+status = "verified"
+evidence = "Record 467 of the table at 0x4018e004 (52 B each) names Bool Operator / Euclidean / OP; 466 is Track Rotation, 468 Track Length - same ids as MKII."
+
+[const.PARAM_ID_VEL]
+value = 30
+status = "verified"
+evidence = "Record 30 names Velocity / VEL."
+
+[fn.param_apply_delta]
+addr = 0x400376d4
+mk2 = 0x400378a6
+status = "verified"
+evidence = "Prologue lea %sp@(-12) / moveml %d2-%d3/%a2 and the loads after it are 0002's and 0003's expect bytes (unique match for the loads)."
+
+[data.param_apply_delta_resume]
+addr = 0x400376dc
+mk2 = 0x400378ae
+status = "verified"
+evidence = "moveal %sp@(16),%a2 / movel %sp@(28),%d3 (unique)."
+
+[data.param_apply_delta_body]
+addr = 0x400376e4
+mk2 = 0x400378b6
+status = "verified"
+evidence = "The mvzb that narrows the FUNC-held argument (0004's expect 77832f2a0074 matches here, unique)."
+
+[fn.param_value_text]
+addr = 0x400a5964
+mk2 = 0x400a85e0
+status = "verified"
+evidence = "Calls param_info, asks vtable[0x24], and on false stores 'ERR' (0x401ff21d) and jmps param_text_format."
+
+[data.param_value_text_resume]
+addr = 0x400a596c
+mk2 = 0x400a85e8
+status = "verified"
+evidence = "movel %sp@(28),%d4 / moveal %sp@(24),%a3 (unique)."
+
+[data.param_value_text_body]
+addr = 0x400a5974
+mk2 = 0x400a85f0
+status = "verified"
+evidence = "After the two loads 0003 re-emits."
+
+[fn.param_text_format]
+addr = 0x4013da44
+mk2 = 0x40163254
+status = "verified"
+evidence = "The tail call of param_value_text's ERR path and of euclid_bool_op_format."
+
+[data.param_short_name_body]
+addr = 0x400a6320
+mk2 = 0x400a8f9e
+status = "verified"
+evidence = "The scs after cmpil #469,%d1 in param_short_name (0x400a62ae), which then indexes the 52-byte records at 0x4018e004."
+
+[data.getbyid_boolop_jsr]
+addr = 0x400a5bd0
+mk2 = 0x400a884c
+status = "verified"
+evidence = "jsr euclid_bool_op_get in the get-by-id switch; 0002 repoints its operand at +2."
+
+[data.setbyid_boolop_jsr]
+addr = 0x400a702c
+mk2 = 0x400a9caa
+status = "verified"
+evidence = "jsr euclid_bool_op_set in the set-by-id switch."
+
+[data.getbyid_vel_jsr]
+addr = 0x400a5b3a
+mk2 = 0x400a87b6
+status = "verified"
+evidence = "jsr vel_get_stock in the get-by-id switch; 0003 repoints its operand."
+
+[data.boolop_iconset_jsr]
+addr = 0x4011cc4e
+mk2 = 0x40143124
+status = "verified"
+evidence = "jsr bitmap_set_make for the Bool Operator glyph set; 0002 repoints its operand."
+
+# =============================================================== 0008 sample cut
+[fn.page_info]
+addr = 0x400f87a2
+mk2 = 0x400ff574
+status = "verified"
+evidence = "Page id -> 36-byte descriptor at 0x4024c5d4 + 36*id for ids 0..10 (moveq #10: MK1 has one page fewer than MKII's 0..11), else the empty descriptor 0x401b9840. Descriptors read back: 0 NONE, 1 TRIG, 2 EUCLIDEAN, 3 LFO, 4 SAMP, 5 FILT, 6 AMP, 7 DEL, 8 REV, 9 DIST, 10 COMP."
+
+[data.page_info_resume]
+addr = 0x400f87a8
+mk2 = 0x400ff57a
+status = "verified"
+evidence = "The cmpl after moveq #10,%d1 / movel %sp@(4),%d0."
+
+[fn.page_get_value]
+addr = 0x400381a0
+mk2 = 0x40038462
+status = "verified"
+evidence = "(view, id, lock): param validity 0x40006e20, container index 0x40006d88, live sound via vtable 0x28, index <= 41 - as MKII. Prologue = 0004's expect bytes."
+
+[data.page_get_value_body]
+addr = 0x400381a8
+mk2 = 0x4003846a
+status = "verified"
+evidence = "moveal %sp@(16),%a2 after the prologue."
+
+[data.param_apply_delta_track]
+addr = 0x400376ea
+mk2 = 0x400378bc
+status = "verified"
+evidence = "jsr track_index_of right after mvzb %d3,%d3 / movel %a2@(116),%sp@-."
+
+[data.param_value_text_args]
+addr = 0x400a597c
+mk2 = 0x400a85f8
+status = "verified"
+evidence = "After movel %sp@(32),%d2 / movel %sp@(36),%d3: the pea of the value into param_info."
+
+[fn.view_invalidate]
+addr = 0x40076c80
+mk2 = 0x40078514
+status = "verified"
+evidence = "The call the page-cycle code makes on the view right after changing its selected page (0x4003a972), as on MKII."
+
+[data.filter_view_page_count]
+addr = 0x400c723e
+status = "verified"
+evidence = "moveq #1,%d1 - the count of the one-entry page list the FILTER view is built from (0x400c71d6 pushes the list 0x401af51c = {5}; the view constructor 0x400ce688 follows)."
+
+[data.filter_view_page_list]
+addr = 0x400c7244
+status = "verified"
+evidence = "Operand of movel #0x401af51c,%d0: the list {5, FILT}. The same pattern builds every page view: {4} SAMP, {6} AMP, {3} LFO, {10} COMP ..."
+
+[data.PARAM_ROM]
+addr = 0x4018e064
+mk2 = 0x401bf918
+status = "verified"
+evidence = "The 52-byte parameter records (param_short_name indexes it): +0 container type, +4 index in it, +8 min, +0xc max, +0x24 modflags, +0x28 name, +0x2c group, +0x30 short name. Ids 1..5 are dead 'Error' records; sound index 0 is used by no sound parameter (sound parameters use 1..41)."
+
+[fn.voice_out]
+addr = 0x401079ca
+status = "verified"
+evidence = "(txbase): for each of the 8 physical voices, 32 samples of three buffers (0x80006c70, 0x800070b0, and 0x80006870 under a per-voice gain ramp from 0x80007070) summed on the EMAC, stored >> 8 to txbase + 4*voice with a 64-byte frame stride - the voices' DAC words. Called by the audio interrupt at 0x401189e8 and 0x40119d8a with txbase = 0x80000000 + (slot << 11), slot from the TX DMA source address."
+
+[data.voice_out_call_a]
+addr = 0x40118a54
+status = "verified"
+evidence = "jsr voice_out on the interrupt's short path (taken while 0x8000aa58 is set)."
+
+[data.voice_out_call_b]
+addr = 0x40119df6
+status = "verified"
+evidence = "jsr voice_out on the interrupt's main path."
+
+[data.voice_owner]
+addr = 0x40254e8c
+mk2 = 0x40290dd8
+status = "verified"
+evidence = "8 bytes, the track that currently owns each physical voice (image default 0,4,1,5,8,6,10,2 - the inverse of track_to_voice's table 0x4018d8d4 = 0,2,7,7,1,3,5,5,4,4,6,6). The audio interrupt compares it with the track at 0x40119f5a. Same rodata delta as cave3 (-0x3bfac)."
+
+[fn.track_to_voice]
+addr = 0x4000704e
+status = "verified"
+evidence = "track 0..11 -> physical voice from the long table 0x4018d8d4, else -1."
+
+
+[data.project_instance]
+addr = 0x416c70c0
+status = "verified"
+evidence = "project_singleton tests it, stores the new project there and returns it (0x40155768). 0008 reads it from the audio interrupt instead of calling the singleton."
+
+[fn.sound_get]
+addr = 0x4017380e
+status = "verified"
+evidence = "Slot 0x28 of Sound's vtable (0x401adc34; typeinfo 5Sound 0x401ad924): return this->+16 - the live sound the kit accessor hands out. Its setter (0x401737be) repoints +16 and notifies, so the pointer is read fresh each time rather than cached."
+
+# ------------------------------------------------------------------ 0004 LFO RND
+# Located with the MKII 1.73 image (Analog-Rytm_MKII_OS1.73.syx, sha256 8ad67108...):
+# both MAIN OS images disassembled, instruction windows normalised (absolute addresses
+# masked) and matched MKII -> MK1 by k-gram vote; every entry below was then read
+# side by side. The matcher is tools/xmatch.py.
+
+[fn.sound_param_id_for_index]
+addr = 0x40006f08
+mk2 = 0x40007028
+status = "verified"
+evidence = "Identical body (moveq #41 bound, machine table for indices 9..16). 48/48 k-gram votes."
+
+[fn.param_container_index]
+addr = 0x40006d88
+mk2 = 0x40006ea8
+status = "verified"
+evidence = "The one ROM-record accessor returning +4 (movel %a0@(4,%d0:l),%d0) behind the #469 clamp. Its 33 callers include the three picker sites below, each matched instruction for instruction."
+
+[data.trig_fire_cfg_resume]
+addr = 0x40099088
+mk2 = 0x4009b008
+status = "verified"
+evidence = "trig_fire after movel %d5,%a4@(12); movel %d0,%a4@(24) (0x40099014). trig_fire's prologue is identical (lea -88, moveml 44 B), so the track is at %sp@(92) here as on MKII."
+
+[fn.lfo_block]
+addr = 0x4009c810
+mk2 = 0x4009e790
+status = "verified"
+evidence = "Identical LFO block: lea 0x8000a9e8 (trig flags), a3 = 0x800050b8 with the per-track LFO fields at a3 + 4616 + 2..16 (MKII 0x8000e57c + 4652), a3 += 84 per track."
+
+[data.lfo_call_resume]
+addr = 0x40119b84
+mk2 = 0x40120fb4
+status = "verified"
+evidence = "The audio interrupt's only call of lfo_block is the jsr at 0x40119b12 (after movel 0x4024be34,%sp@-); this is the addql #4,%sp after it."
+
+[data.TRIG_FLAGS]
+addr = 0x8000a9e8
+mk2 = 0x8000e508
+status = "verified"
+evidence = "lfo_block's first lea (MKII 0x8000e508 at the same instruction): per-track long, 1 when a note started this block."
+
+[data.PARAMS_EFF]
+addr = 0x800062c0
+mk2 = 0x8000f7a8
+status = "verified"
+evidence = "The per-track effective parameter array the LFO modulates: lfo_block reads it as a3 + 4616 from 0x800050b8, and the interrupt rebuilds it at 0x401199c8 (lea 0x800062c0,%a0, MKII lea 0x8000f7a8 at 0x40120dea). 42 words per track, stride 0x54."
+
+[data.param_knob_draw_body]
+addr = 0x400a58f0
+mk2 = 0x400a8584
+status = "verified"
+evidence = "param_knob_draw past lea %sp@(-24),%sp; moveml %d2-%d6/%a2,%sp@. DIFFERS from MKII: MK1 also reads the argument slots +16 (a flag byte) and +20 (a pointer) that MKII leaves alone; x/y/h sit at +24/+28/+32 in both, and its callback frame is (functor, value, x, y, h, flag) with flag = 1 unless the pointer's +24 is <= 8."
+
+[fn.lfo_dst_knob_draw]
+addr = 0x400f8e76
+mk2 = 0x400ff9fc
+status = "verified"
+evidence = "Same body as MKII's (project -> track -> sound's destination list via vtable +0x4c, value >> 8, ROM record +0x30 short name, text draw). Reads the value at +8 and x/y/h at +12/+16/+20 only."
+
+[data.param_set_value_body]
+addr = 0x400a638a
+mk2 = 0x400a9008
+status = "verified"
+evidence = "param_set_value past lea %sp@(-40),%sp; moveml %d2-%d7/%a2,%sp@ (0x400a6316); same argument loads after."
+
+[data.param_set_read_body]
+addr = 0x400a6186
+mk2 = 0x400a8e02
+status = "verified"
+evidence = "param_set_read past lea %sp@(-16),%sp; moveml %d2/%a2/%fp,%sp@ (0x400a6112)."
+
+[fn.dest_list_build]
+addr = 0x400a7596
+mk2 = 0x400aa214
+status = "verified"
+evidence = "Identical builder; called by the list view constructor 0x4004a3cc at 0x4004a572 with (set, mask) and the vector at %fp@(-88)."
+
+[data.dest_list_build_resume]
+addr = 0x4004a578
+mk2 = 0x4004aecc
+status = "verified"
+evidence = "The addql #8,%sp after jsr dest_list_build in the list view constructor. The constructor matches MKII instruction for instruction: container index at %fp@(20) -> view +180, x at %fp@(36) -> +184, width %fp@(40) -> +188, mask at %fp@(32)."
+
+[data.list_same_resume]
+addr = 0x40039ae0
+mk2 = 0x40039d38
+status = "verified"
+evidence = "The picker's is-this-list-the-knob's test: after jsr param_container_index at 0x40039ada (lea %sp@(12),%sp; cmpl %d5,%d0)."
+
+[data.list_new_resume]
+addr = 0x40039b48
+mk2 = 0x40039da0
+status = "verified"
+evidence = "The picker creating a list: after jsr param_container_index at 0x40039b42 (andil #65536,%d7)."
+
+[data.knob_cidx_resume]
+addr = 0x4003a3d4
+mk2 = 0x4003a5f8
+status = "verified"
+evidence = "The page key handler's knob-event path: after jsr param_container_index at 0x4003a3ce; the result is stored to %fp@(-20) at 0x4003a3d8 and read by the release at 0x4003a7fa."
+
+[data.lfo_view_page_count]
+addr = 0x400c72e6
+mk2 = 0x400cb02a
+status = "verified"
+evidence = "moveq #1,%d1 before movel #0x401af514,%d0 = {3}: the voice LFO view (among SAMP/FILT/AMP; the second {3} list at 0x400c743e follows DEL/REV/DIST/COMP and is the FX track's)."
+
+[data.lfo_view_page_list]
+addr = 0x400c72ec
+mk2 = 0x400cb030
+status = "verified"
+evidence = "Operand of movel #0x401af514,%d0, the one-entry list {3}."
+
+# ============================================================ machines (0009)
+# Found on MK1 directly (2026-10-10), not ported from MKII; re/analog-voice.md.
+
+[data.machine_fn]
+addr = 0x40254430
+status = "verified"
+evidence = "53 longs, one per machine type. The audio interrupt's voice loop (0x40119c4e..0x40119d42) loads machine = (s8) 0x8000553c[track], skips > 52, and calls this[machine](voice, 0x80004ce0, &PARAMS_EFF[track][9], note) once per block. Entries match the machine name table 0x4018d690 (0 BD HARD 0x4010a490, 1 BD CLASSIC 0x401096f0, 44 BD TEST 0x40116cae, ...)."
+
+[data.machine_voice_mask]
+addr = 0x4018d8c9
+status = "verified"
+evidence = "Read by 0x40006fc6(machine, voice) as byte 0x4018d869[machine * 2], bit voice. BD/SD machines hold 0x85 (voices 0, 2, 7 - the dual-VCO voices), CH 0x10, CY/CB 0x40; machines 34..52 hold 0, which is how they are hidden. Callers include set-machine-on-track 0x400ba1e2, the kit setter 0x400a3e4c and the audio interrupt (0x40118dc4)."
+
+[fn.bd_classic_machine]
+addr = 0x4010975c
+status = "verified"
+evidence = "machine_fn[1]. (voice, ctx, params, note): params LEV TUN DEC HLD SWT SWD WAV TRA (indices 9..16, records 108..115). Tune -> 0x40117a44(tune, note) -> 0x40117a6e (exp2) -> frame +90/+92 on voice 0 (+98 voice 2, +106 voice 7); LEV squared -> frame +96 every block; state machine on MACHINE_VOICE_STATE; tail-calls 0x40114e1a."
+
+[data.MACHINE_VOICE_STATE]
+addr = 0x8000ac04
+status = "verified"
+evidence = "Per physical voice, stride 32: a long state word and a countdown at +4. The interrupt clears both on a new note (0x40119bc6/0x40119bd0), sets -1 when the voice changes hands (0x40119ce4) and takes 16 off the countdown every block (0x40119d50). BD CLASSIC and BD TEST test it for 0 (note start)."
+
+[fn.sd_classic_machine]
+addr = 0x40110b7c
+status = "verified"
+evidence = "machine_fn[3]. (voice, ctx, params, note): params LEV TUN DEC DET SNP NOD NOL BAL (indices 9..16, records 124..131). Osc 1 tune = TUN, osc 2 = TUN + DET (saturated), both through 0x40117a44/0x40117a6e; BAL through 0x40102830 to the two level words; DEC to the body envelope segment, rate (64 * DEC/256 + 16256) << 5 (0x40110f6c); NOD selects a per-block noise multiplier from 0x401c2c60, NOL the noise level; tail-calls 0x40114e1a."
+[fn.bt_classic_machine]
+addr = 0x4011476c
+status = "probably-verified"
+evidence = "machine_fn[7]. (voice, ctx, params, note): params LEV TUN DEC - NOL SNP SWD - (records 156..161). Voice 1 only. The XT CLASSIC kind: frequency word ctx +118, damping word +120 from DEC and the pitch, a decaying LEV^2 pulse into the DAC ring, digital noise NOL into buffer B (re/hidden-machines.md). Recorded on an MK1 (WAVS3, 2026-10-13): TUN steps a quarter semitone, 60.8 Hz at TUN 64; at DEC 63 t30 1863 / 726 / 64 ms at 25 / 61 / 131 Hz; at 77 Hz DEC 0 / 32 / 64 / 96 / 127 ~50 / 252 / 412 / 548 / 650 ms; SNP 1..3 holds ~2x the pitch for 1..3 cycles."
+
+[fn.xt_classic_machine]
+addr = 0x40114a1c
+status = "verified"
+evidence = "machine_fn[8]. (voice, ctx, params, note): params LEV TUN DEC SWD SWT NOD NOL TON (records 162..169). Runs on voices 3 and 5 only. Every block: pitch = 0x40117a14(TUN, note + sweep) (0x200 per semitone), sweep = SWD << 5 decaying by table[SWT]; writes the resonator frequency word (ctx +124 / +128) and a damping word from DEC and the frequency (ctx +122 / +126); pings the voice with a decaying pulse written straight into the DAC ring (DAC_LT_TRIG / DAC_MT_TRIG); noise gain NOL^2 LEV decaying by table 0x401c5550[NOD], filter tracking TUN and TON."

@@ -1,0 +1,8 @@
+# build output and fetched tools
+build/
+vendor/
+__pycache__/
+*.pyc
+
+# Elektron's firmware is never committed: put your own copy in stock/
+stock/*.syx
