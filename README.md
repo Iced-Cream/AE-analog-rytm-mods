@@ -1,7 +1,7 @@
 # Analog Rytm MK1 - OS 1.74 mods
 
-A small build pipeline that patches the official Analog Rytm MK1 OS 1.74 firmware
-with extra features, and the mods themselves:
+Build pipeline that patches the official Analog Rytm MK1 OS 1.74 firmware
+with extra features:
 
 | mod | what it does |
 |---|---|
@@ -33,7 +33,7 @@ How to flash and get back to stock: [docs/FLASHING.md](docs/FLASHING.md).
 - A machine that can run the build: Linux, macOS, or Windows with WSL (Ubuntu).
 - Transfer (Elektron's app) or any SysEx tool to send the firmware.
 
-## How it works, briefly
+## How it works
 
 The stock firmware is unpacked, and each mod adds small ColdFire assembly routines
 in unused space of the image (padding, and the routines of machines the firmware
