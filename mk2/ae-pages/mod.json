@@ -1,0 +1,88 @@
+{
+ "id": "ae-pages",
+ "version": "1.0",
+ "title": "AE pages",
+ "category": "Framework",
+ "author": "Iced-Cream (for hugz202's AE-analog-rytm-mods)",
+ "license": "MIT",
+ "description": "What the AE mods' extra parameter pages share on the Analog Rytm MKII: one place in each of page_info (its eight callers), page_get_value, param_apply_delta and param_value_text, handed on to every page in its table (ae_pages). Each page mod adds a descriptor: its page id, its page entry, and get, delta and text functions for its knobs. On the MK1 these hooks are shared through the build's detour chains; on the MKII rytm2_mods holds the free instructions at the start of those routines, so this takes the next one in each. On its own it changes nothing the unit does.",
+ "device": "analog-rytm-mk2",
+ "os": "1.74",
+ "sources": [
+  "ae-pages.s"
+ ],
+ "sites": [
+  {
+   "addr": "0x4003794c",
+   "stock": "4eb9400ff5e0",
+   "op": "keep2",
+   "target": "ae_pages_info"
+  },
+  {
+   "addr": "0x40037976",
+   "stock": "4eb9400ff5e0",
+   "op": "keep2",
+   "target": "ae_pages_info"
+  },
+  {
+   "addr": "0x4003a29e",
+   "stock": "4eb9400ff5e0",
+   "op": "keep2",
+   "target": "ae_pages_info"
+  },
+  {
+   "addr": "0x4003a3b6",
+   "stock": "4eb9400ff5e0",
+   "op": "keep2",
+   "target": "ae_pages_info"
+  },
+  {
+   "addr": "0x4003a4ce",
+   "stock": "4eb9400ff5e0",
+   "op": "keep2",
+   "target": "ae_pages_info"
+  },
+  {
+   "addr": "0x400aa12a",
+   "stock": "49f9400ff5e0",
+   "op": "keep2",
+   "target": "ae_pages_info"
+  },
+  {
+   "addr": "0x400aa226",
+   "stock": "49f9400ff5e0",
+   "op": "keep2",
+   "target": "ae_pages_info"
+  },
+  {
+   "addr": "0x400aa838",
+   "stock": "49f9400ff5e0",
+   "op": "keep2",
+   "target": "ae_pages_info"
+  },
+  {
+   "addr": "0x40038472",
+   "stock": "262f00186d52",
+   "op": "jmp",
+   "target": "ae_pages_get"
+  },
+  {
+   "addr": "0x400378c8",
+   "stock": "2f0a206800a0",
+   "op": "jmp",
+   "target": "ae_pages_delta"
+  },
+  {
+   "addr": "0x400a866c",
+   "stock": "588f24404aaa001c",
+   "op": "jmp",
+   "target": "ae_pages_text"
+  }
+ ],
+ "collections": {
+  "ae_pages": 4
+ },
+ "requires": [
+  "core"
+ ]
+}
