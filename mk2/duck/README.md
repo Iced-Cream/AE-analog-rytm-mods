@@ -32,18 +32,20 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   COMP's MIX knob. The settings keep 8.8 fractions, as stock does, so turns
   smaller than a step add up.
 - **Page.** Page 14, after COMP (page 11) in the COMP view's list, through
-  [ae-pages](../ae-pages/README.md).
+  core-ar2 0.4's page tables (`core_pages`, `core_params`).
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.3 and ae-pages.
+- Needs core-ar2 0.4 (its page tables).
 - **Cannot share a build with comp-preview**: both change the COMP view's
   page list (`0x400cb1ee`, `0x400cb1f2`).
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
 
 ## Status
 
-- Emulator (rytm-emu), core + ae-pages + duck: the page shows behind COMP,
+- Emulator (rytm-emu), core 0.4 + duck, and core 0.4 with the rytm2_mods
+  mods (lfo-rnd 1.2, voice-dac 1.3) and cpu-probe: the page shows behind COMP.
+  Earlier, with core 0.3 + the ae-pages framework + duck: the page shows behind COMP,
   the five knobs turn with value popups and long names. With SRC = BD, DEP
   90, ATK 3, HLD 22 (set directly in RAM; the emulator's encoder dead zone
   makes small turns unreliable), SD then BD 0.5 s later, SD's VCA L word:

@@ -5,7 +5,7 @@
  "category": "Sound",
  "author": "hugz202 (AE-analog-rytm-mods); MKII port: Iced-Cream",
  "license": "MIT",
- "description": "Sidechain-style pumping without the analog compressor: every audio block the other voices' analog VCA words are scaled by a gain that dips when the key track's voice hits. FX track, AMP (COMP) pressed twice: the DUCK page, SRC (OFF or the key track), DEP, ATK, HLD, REL. Global settings held in RAM (SRC OFF at power-up). The key is the source voice's own audio as the codec captured it, one block late; the delay and reverb returns are not ducked. Its knobs are the hidden HH TEST machine's parameter records, renamed. Needs ae-pages. Cannot share a build with comp-preview, which changes the same COMP page list. Port of AE-analog-rytm-mods 0012-duck (Analog Rytm MK1).",
+ "description": "Sidechain-style pumping without the analog compressor: every audio block the other voices' analog VCA words are scaled by a gain that dips when the key track's voice hits. FX track, AMP (COMP) pressed twice: the DUCK page, SRC (OFF or the key track), DEP, ATK, HLD, REL. Global settings held in RAM (SRC OFF at power-up). The key is the source voice's own audio as the codec captured it, one block late; the delay and reverb returns are not ducked. Its knobs are the hidden HH TEST machine's parameter records, renamed. Needs core-ar2 0.4 (its page tables). Cannot share a build with comp-preview, which changes the same COMP page list. Port of AE-analog-rytm-mods 0012-duck (Analog Rytm MK1).",
  "device": "analog-rytm-mk2",
  "os": "1.74",
  "sources": [
@@ -136,22 +136,34 @@
  ],
  "contribute": [
   {
-   "to": "ae_pages",
+   "to": "core_pages",
    "order": 14,
    "data": "00000000",
    "relocs": [
     [
      0,
      "abs32",
-     "sym:duck_desc",
+     "sym:duck_page",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_params",
+   "order": 50,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:duck_params",
      0
     ]
    ]
   }
  ],
  "requires": [
-  "core",
-  "ae-pages"
+  "core"
  ],
  "conflicts": [
   "comp-preview"
@@ -162,5 +174,8 @@
    "fn": "duck_tick",
    "order": 50
   }
- ]
+ ],
+ "resources": {
+  "core": "0.4"
+ }
 }

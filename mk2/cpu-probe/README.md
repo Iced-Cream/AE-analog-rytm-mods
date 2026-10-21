@@ -43,8 +43,8 @@ Plus `ev_render_in` and `ev_render_out`. RAM: 512 B code, 80 B .bss.
 
 ## Status
 
-- Builds for OS 1.74 with core-ar2 0.3. Links with core and all eleven
-  rytm2_mods v1.2 mods.
+- Builds for OS 1.74 with core-ar2 0.3 and 0.4. Links with core 0.3 and all
+  eleven rytm2_mods v1.2 mods, and with core 0.4 and their page-table versions.
 - Emulator (rytm-emu): the three labels show readouts. Every other screen of
   the walk through GLOBAL > MIDI CONFIG > CHANNELS is pixel-identical to stock.
   The emulator does not model the hardware's timing, so its numbers mean nothing.

@@ -27,7 +27,7 @@
         | once the voice fell below -48 dBFS since the last one.
         |
         | The page: page 14 after COMP (page 11) in the COMP view's list, through
-        | ae-pages. Its knobs are HH TEST's parameter records 443..447 (a hidden
+        | core-ar2 0.4's page tables. Its knobs are HH TEST's parameter records 443..447 (a hidden
         | machine's, renamed): the MKII has none of the MK1's spare Error records
         | left once rytm2_mods is in. The COMP view's page list is also what
         | comp-preview changes, so the two cannot be in one build.
@@ -175,7 +175,7 @@ duck_gate:
         rts
 
         | ==================================================================
-        | The page, through ae-pages (C convention)
+        | The page, through core-ar2's core_pages and core_params (C convention)
         | ==================================================================
 
         | knob_of(d0 = id) -> d0 = knob 0..4 or -1 (flags set)
@@ -190,22 +190,28 @@ knob_of:
 2:      tst.l   %d0
         rts
 
-        | long get(long id): the knob's setting, or -1
+        | int get(long id, long *value): the knob's setting in 8.8
         .align  2
 dk_get:
         move.l  4(%sp),%d0
-        bsr.s   knob_of
+        bsr.w   knob_of
         bmi.s   9f
         lea     dk_set,%a0
         mvz.b   (%a0,%d0.l),%d0
-9:      rts
+        lsl.l   #8,%d0
+        move.l  8(%sp),%a0
+        move.l  %d0,(%a0)
+        moveq   #1,%d0
+        rts
+9:      moveq   #0,%d0
+        rts
 
-        | long delta(void *view, long id, long delta): the delta in 8.8, added
+        | int delta(void *view, long id, long delta, long func): the delta in 8.8, added
         | to the knob's 8.8 value (dk_acc), whose whole part is the setting
         .align  2
 dk_delta:
         move.l  8(%sp),%d0
-        bsr.s   knob_of
+        bsr.w   knob_of
         bmi.s   8f
         move.l  %d0,%a1                           | the knob
         lea     dk_acc,%a0
@@ -229,16 +235,18 @@ dk_delta:
 8:      moveq   #0,%d0
         rts
 
-        | long text(long id, char *buf)
+        | int text(struct core_text *t): t = {obj, id, value, buf}
         .align  2
 dk_text:
-        move.l  4(%sp),%d0
-        bsr.s   knob_of
+        move.l  4(%sp),%a1
+        move.l  4(%a1),%d0                        | the id
+        bsr.w   knob_of
         bmi.s   8f
         move.l  %d0,%d1
         lea     dk_set,%a0
         mvz.b   (%a0,%d0.l),%d0
-        move.l  8(%sp),%a1
+        move.l  4(%sp),%a1
+        move.l  12(%a1),%a1                       | the buffer
         tst.l   %d1
         bne.s   2f
         lea     src_names,%a0                     | SRC: the track's name
@@ -318,11 +326,11 @@ duck_tick:
         .align  4
         .globl  duck_pages
 duck_pages:     .long   PAGE_COMP, PAGE_DUCK      | the COMP view's pages
-page_duck:      .long   str_page                  | {name, A..D, E..H}
+        .globl  duck_page, duck_params
+duck_page:      .long   PAGE_DUCK, str_page       | core_pages: {page, name, A..D, E..H}
                 .long   ID0, ID0+1, ID0+2, ID0+3
                 .long   ID0+4, 0, 0, 0
-        .globl  duck_desc
-duck_desc:      .long   PAGE_DUCK, page_duck, dk_get, dk_delta, dk_text
+duck_params:    .long   ID0, ID0+KNOBS-1, dk_get, dk_delta, dk_text  | core_params
 dk_state:       .long   0, 0, 1                   | env, hold, armed
 dk_acc:         .short  0, 90<<8, 3<<8, 22<<8, 36<<8  | the settings in 8.8
 dk_ready:       .byte   0

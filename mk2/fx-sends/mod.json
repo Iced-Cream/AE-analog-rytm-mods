@@ -5,7 +5,7 @@
  "category": "Effect",
  "author": "hugz202 (AE-analog-rytm-mods); MKII port: Iced-Cream",
  "license": "MIT",
- "description": "A chorus as one more send effect, with the Analog Four chorus's controls. Press AMP a second time for the FX SENDS page: CHR, each track's send to a stereo chorus (saved with the sound, in core-ar2's mod storage), and the chorus's settings PRE, SPD, DEP, WID, FDB, HPF and the return's level VOL, global and held in RAM (back to their defaults at power-up, as on the MK1). The chorus runs on the ColdFire in the audio interrupt after the stock delay and reverb, on the voices the codec captured: two interpolated taps on one line, a one-pole high-pass on its input, the taps' average fed back. Its return joins the delay and reverb returns' PRE words (into the analog distortion and compressor) and follows the FX track's level, as the stock returns do. Nothing runs while no track sends. Its knobs are the hidden CY TEST machine's parameter records, renamed. Needs ae-pages and core-ar2 0.3 (7 bits of sound storage), so it cannot share a build with both voice-dac and lfo-rnd. Port of AE-analog-rytm-mods 0010-fx-sends (Analog Rytm MK1).",
+ "description": "A chorus as one more send effect, with the Analog Four chorus's controls. Press AMP a second time for the FX SENDS page: CHR, each track's send to a stereo chorus (saved with the sound, in core-ar2's mod storage), and the chorus's settings PRE, SPD, DEP, WID, FDB, HPF and the return's level VOL, global and held in RAM (back to their defaults at power-up, as on the MK1). The chorus runs on the ColdFire in the audio interrupt after the stock delay and reverb, on the voices the codec captured: two interpolated taps on one line, a one-pole high-pass on its input, the taps' average fed back. Its return joins the delay and reverb returns' PRE words (into the analog distortion and compressor) and follows the FX track's level, as the stock returns do. Nothing runs while no track sends. Its knobs are the hidden CY TEST machine's parameter records, renamed. Needs core-ar2 0.4 (its page tables, and 7 bits of sound storage), so it cannot share a build with both voice-dac and lfo-rnd. Port of AE-analog-rytm-mods 0010-fx-sends (Analog Rytm MK1).",
  "device": "analog-rytm-mk2",
  "os": "1.74",
  "sources": [
@@ -19,7 +19,7 @@
   }
  ],
  "resources": {
-  "core": "0.3"
+  "core": "0.4"
  },
  "sites": [
   {
@@ -224,21 +224,33 @@
  ],
  "contribute": [
   {
-   "to": "ae_pages",
+   "to": "core_pages",
    "order": 15,
    "data": "00000000",
    "relocs": [
     [
      0,
      "abs32",
-     "sym:fx_sends_desc",
+     "sym:fx_sends_page",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_params",
+   "order": 50,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:fx_sends_params",
      0
     ]
    ]
   }
  ],
  "requires": [
-  "core",
-  "ae-pages"
+  "core"
  ]
 }

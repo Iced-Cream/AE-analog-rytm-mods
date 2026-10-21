@@ -42,7 +42,7 @@ the tail has died (about 3 s).
   sum. That this is the PRE path on the MKII is read from the code and from
   voice-dac's notes, **not checked on hardware for this mod**.
 - **CHR storage.** The MK1 kept CHR in the sound's free parameter word. Here
-  it is a 7-bit sound field in core-ar2 0.3's mod storage (`fx_sends_chr`),
+  it is a 7-bit sound field in core-ar2's mod storage (`fx_sends_chr`),
   so it travels with the sound and the sound's stock bytes stay stock. The
   audio interrupt never calls core: the UI tick (20 Hz) copies each track's CHR
   into a table the interrupt reads, and an edit updates its track at once. Each
@@ -55,22 +55,28 @@ the tail has died (about 3 s).
   COMP's MIX knob (as duck does). The global settings keep 8.8 fractions; CHR
   keeps one fraction, for the track it was last turned on.
 - **Page.** Page 15, after AMP (page 7) in the AMP view's list
-  (`0x400cb040`, `0x400cb044`), through [ae-pages](../ae-pages/README.md).
+  (`0x400cb040`, `0x400cb044`), through core-ar2 0.4's page tables
+  (`core_pages`, `core_params`).
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.3 and ae-pages.
+- Needs core-ar2 0.4 (its page tables).
 - Uses 7 bits of core-ar2's 56-bit sound storage. voice-dac (39) and lfo-rnd
   (16) use 55, so **fx-sends cannot be in a build with both of them**; the
   patcher refuses that build ("the mods need 62 bits of sound storage"). It
   links with either one of them.
-- Linked and run in the emulator with core, ae-pages, cpu-probe, duck and the
+- With core 0.3 (before the page tables), linked and run in the emulator with
+  core, ae-pages, cpu-probe, duck and the
   rytm2_mods v1.2 mods minus comp-preview (which conflicts with duck) and minus
   lfo-rnd or voice-dac. It also links with comp-preview when duck is left out.
 
 ## Status
 
-Emulator (rytm-emu), core + ae-pages + fx-sends, and both full builds above:
+Emulator (rytm-emu), core 0.4 + fx-sends, and core 0.4 with the rytm2_mods mods
+(all but lfo-rnd, so with voice-dac 1.3 and comp-preview) and cpu-probe: the
+page shows and its knobs
+turn. Earlier, with core 0.3 + the ae-pages framework + fx-sends, and both full
+builds above:
 
 - The page shows behind AMP on the BD track with CHR PRE SPD DEP / WID FDB HPF
   VOL, long names in the header while a knob turns, values in the popups.

@@ -37,7 +37,7 @@
         | into chr_trk, and an edit updates its track's entry at once.
         |
         | The page: page 15 after AMP (page 7) in the AMP view's list, through
-        | ae-pages. Its knobs are CY TEST's parameter records 449..456 (a hidden
+        | core-ar2 0.4's page tables. Its knobs are CY TEST's parameter records 449..456 (a hidden
         | machine's, renamed).
         |
         | Memory: the line and buffers are this mod's .bss (8.5 KB), not raw DRAM.
@@ -516,7 +516,7 @@ sel_track:
         rts
 
         | ==================================================================
-        | The page, through ae-pages (C convention)
+        | The page, through core-ar2's core_pages and core_params (C convention)
         | ==================================================================
 
         | knob_of(d0 = id) -> d0 = knob 0..7 or -1 (flags set)
@@ -552,16 +552,22 @@ value_of:
 8:      moveq   #0,%d0
         rts
 
-        | long get(long id): the knob's setting, or -1
+        | int get(long id, long *value): the knob's setting in 8.8
         .align  2
 fs_get:
         move.l  4(%sp),%d0
         bsr.s   knob_of
         bmi.s   9f
         bsr.s   value_of
-9:      rts
+        lsl.l   #8,%d0
+        move.l  8(%sp),%a0
+        move.l  %d0,(%a0)
+        moveq   #1,%d0
+        rts
+9:      moveq   #0,%d0
+        rts
 
-        | long delta(void *view, long id, long delta): the delta in 8.8, added
+        | int delta(void *view, long id, long delta, long func): the delta in 8.8, added
         | to the knob's 8.8 value, whose whole part is the setting. The globals
         | keep their fractions in acc; CHR keeps one fraction, for the track it
         | was last turned on.
@@ -653,14 +659,16 @@ clamp:
         move.l  %d1,%d0
 2:      rts
 
-        | long text(long id, char *buf): plain 0..127
+        | int text(struct core_text *t): plain 0..127; t = {obj, id, value, buf}
         .align  2
 fs_text:
-        move.l  4(%sp),%d0
+        move.l  4(%sp),%a1
+        move.l  4(%a1),%d0                        | the id
         bsr.w   knob_of
         bmi.s   8f
         bsr.w   value_of
-        move.l  8(%sp),%a1
+        move.l  4(%sp),%a1
+        move.l  12(%a1),%a1                       | the buffer
         bsr.s   put_u3
         clr.b   (%a1)
         moveq   #1,%d0
@@ -758,11 +766,11 @@ fx_sends_project:
         .align  4
         .globl  fx_sends_pages
 fx_sends_pages: .long   PAGE_AMP, PAGE_FX         | the AMP view's pages
-page_fx:        .long   str_page                  | {name, A..D, E..H}
+        .globl  fx_sends_page, fx_sends_params
+fx_sends_page:  .long   PAGE_FX, str_page         | core_pages: {page, name, A..D, E..H}
                 .long   ID0, ID0+1, ID0+2, ID0+3
                 .long   ID0+4, ID0+5, ID0+6, ID0+7
-        .globl  fx_sends_desc
-fx_sends_desc:  .long   PAGE_FX, page_fx, fs_get, fs_delta, fs_text
+fx_sends_params: .long  ID0, ID0+KNOBS-1, fs_get, fs_delta, fs_text  | core_params
 acc:            .short  0, 40<<8, 24<<8, 64<<8, 96<<8, 0, 0, 100<<8  | the globals in 8.8
 globals:        .byte   40, 24, 64, 96, 0, 0, 100 | PRE SPD DEP WID FDB HPF VOL (defaults)
 ready:          .byte   0
