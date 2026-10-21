@@ -19,19 +19,6 @@
    "target": "duck_gate"
   },
   {
-   "addr": "0x400cb1ee",
-   "stock": "7201",
-   "op": "bytes",
-   "new": "7202",
-   "kind": "code"
-  },
-  {
-   "addr": "0x400cb1f2",
-   "stock": "203c401e1db4",
-   "op": "keep2",
-   "target": "duck_pages"
-  },
-  {
    "addr": "0x401c55d0",
    "stock": "00007f00",
    "op": "bytes",
@@ -160,13 +147,23 @@
      0
     ]
    ]
+  },
+  {
+   "to": "core_view_pages",
+   "order": 30,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:duck_view_page",
+     0
+    ]
+   ]
   }
  ],
  "requires": [
   "core"
- ],
- "conflicts": [
-  "comp-preview"
  ],
  "subscribe": [
   {

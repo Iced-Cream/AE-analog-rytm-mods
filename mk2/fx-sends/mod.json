@@ -47,19 +47,6 @@
    "target": "fx_sends_ret_gate"
   },
   {
-   "addr": "0x400cb040",
-   "stock": "7201",
-   "op": "bytes",
-   "new": "7202",
-   "kind": "code"
-  },
-  {
-   "addr": "0x400cb044",
-   "stock": "203c401e1dc8",
-   "op": "keep2",
-   "target": "fx_sends_pages"
-  },
-  {
    "addr": "0x401c5724",
    "stock": "40237f1b",
    "op": "ptr",
@@ -245,6 +232,19 @@
      0,
      "abs32",
      "sym:fx_sends_params",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_view_pages",
+   "order": 30,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:fx_sends_view_page",
      0
     ]
    ]

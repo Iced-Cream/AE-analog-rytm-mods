@@ -324,8 +324,8 @@ duck_tick:
         | Data
         | ==================================================================
         .align  4
-        .globl  duck_pages
-duck_pages:     .long   PAGE_COMP, PAGE_DUCK      | the COMP view's pages
+        .globl  duck_view_page
+duck_view_page: .long   8, PAGE_DUCK              | core_view_pages: CORE_VIEW_COMP
         .globl  duck_page, duck_params
 duck_page:      .long   PAGE_DUCK, str_page       | core_pages: {page, name, A..D, E..H}
                 .long   ID0, ID0+1, ID0+2, ID0+3

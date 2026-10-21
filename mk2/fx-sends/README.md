@@ -54,9 +54,9 @@ the tail has died (about 3 s).
   At the first UI tick their RAM records take the dial art and encoder feel of
   COMP's MIX knob (as duck does). The global settings keep 8.8 fractions; CHR
   keeps one fraction, for the track it was last turned on.
-- **Page.** Page 15, after AMP (page 7) in the AMP view's list
-  (`0x400cb040`, `0x400cb044`), through core-ar2 0.4's page tables
-  (`core_pages`, `core_params`).
+- **Page.** Page 15, after AMP (page 7) in the AMP view's list, through
+  core-ar2 0.4's page tables (`core_pages`, `core_params`) and page-key lists
+  (`core_view_pages`, order 30).
 
 ## Needs and conflicts
 
@@ -67,8 +67,8 @@ the tail has died (about 3 s).
   links with either one of them.
 - With core 0.3 (before the page tables), linked and run in the emulator with
   core, ae-pages, cpu-probe, duck and the
-  rytm2_mods v1.2 mods minus comp-preview (which conflicts with duck) and minus
-  lfo-rnd or voice-dac. It also links with comp-preview when duck is left out.
+  rytm2_mods v1.2 mods minus comp-preview (which then conflicted with duck) and
+  minus lfo-rnd or voice-dac. It also linked with comp-preview when duck was left out.
 
 ## Status
 

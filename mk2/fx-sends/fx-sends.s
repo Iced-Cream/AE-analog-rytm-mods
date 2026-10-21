@@ -764,8 +764,8 @@ fx_sends_project:
         | Data
         | ==================================================================
         .align  4
-        .globl  fx_sends_pages
-fx_sends_pages: .long   PAGE_AMP, PAGE_FX         | the AMP view's pages
+        .globl  fx_sends_view_page
+fx_sends_view_page: .long 3, PAGE_FX              | core_view_pages: CORE_VIEW_AMP
         .globl  fx_sends_page, fx_sends_params
 fx_sends_page:  .long   PAGE_FX, str_page         | core_pages: {page, name, A..D, E..H}
                 .long   ID0, ID0+1, ID0+2, ID0+3

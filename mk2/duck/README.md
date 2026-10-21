@@ -32,17 +32,20 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   COMP's MIX knob. The settings keep 8.8 fractions, as stock does, so turns
   smaller than a step add up.
 - **Page.** Page 14, after COMP (page 11) in the COMP view's list, through
-  core-ar2 0.4's page tables (`core_pages`, `core_params`).
+  core-ar2 0.4's page tables (`core_pages`, `core_params`) and page-key
+  lists (`core_view_pages`, order 30: after comp-preview's preview).
 
 ## Needs and conflicts
 
 - Needs core-ar2 0.4 (its page tables).
-- **Cannot share a build with comp-preview**: both change the COMP view's
-  page list (`0x400cb1ee`, `0x400cb1f2`).
+- Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
+  COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
 
 ## Status
 
+- Emulator (rytm-emu), core 0.4 + all eleven rytm2_mods mods (comp-preview
+  1.1 included) + duck + cpu-probe: the COMP key steps COMP, preview, DUCK.
 - Emulator (rytm-emu), core 0.4 + duck, and core 0.4 with the rytm2_mods
   mods (lfo-rnd 1.2, voice-dac 1.3) and cpu-probe: the page shows behind COMP.
   Earlier, with core 0.3 + the ae-pages framework + duck: the page shows behind COMP,

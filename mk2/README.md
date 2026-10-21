@@ -36,8 +36,7 @@ Keep the lockfile: it decides where fx-sends' CHR sits in the sound's storage.
 
 ## Builds that cannot be made
 
-These follow from what the MKII has room for, and the patcher refuses them:
+This one follows from what the MKII has room for, and the patcher refuses it:
 
-- **duck with comp-preview**: both change the COMP view's page list.
 - **fx-sends with both voice-dac and lfo-rnd**: the three need 62 bits of
   core-ar2's 56-bit sound storage. fx-sends links with either one.
