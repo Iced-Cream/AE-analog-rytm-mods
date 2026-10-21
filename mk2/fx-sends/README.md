@@ -90,7 +90,9 @@ builds above:
 without lfo-rnd, and cpu-probe: CHORUS SEND opens behind AMP with popups and
 long names, CHR on one track gives a chorus on that track only, and VOL changes
 its level; DAC FILTER and the COMP preview work beside it; cpu-probe was read
-with the chorus on.
+with the chorus on. With core's page step (no lfo-rnd in the build) the header
+names CHORUS SEND; with DAC SUM, the chorus and the preview together, the audio
+interrupt reads 92% and peaks at 94%, nothing audible.
 
 **Not checked on hardware:** the level of the return against the delay and
 reverb, and CHR surviving a kit save, a reload and a power

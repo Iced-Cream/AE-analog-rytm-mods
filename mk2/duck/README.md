@@ -66,7 +66,10 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   rytm2_mods mods and cpu-probe: COMP cycles COMP, comp-preview's preview,
   DUCK; each knob shows its popup and long name; with SRC BD and DEP about 90
   the other tracks duck on each BD hit, the preview's trace running beside it;
-  DUCK stays shown on leaving the FX track. Not measured: the exact gain
+  DUCK stays shown on leaving the FX track. With core's page step and kept
+  page, DUCK is kept on coming back after DELAY or a voice track, also with
+  voice-dac and duck alone (no comp-preview), the header naming each page.
+  Not measured: the exact gain
   curve against the table above.
 
 Credit: hugz202 (AE-analog-rytm-mods, MIT) for the mod.
