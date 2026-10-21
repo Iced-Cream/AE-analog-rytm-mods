@@ -61,6 +61,12 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   With SRC OFF the word stays at 12735.
 - The emulator models the VCA words, not the analog VCA, so the audible
   result (and the -36/-48 dBFS key thresholds against the MKII's real input
-  levels) is **not checked on hardware yet**.
+  levels) were checked on hardware afterwards (below).
+- Hardware, Analog Rytm MKII OS 1.74, 21 Oct 2026, core 0.4 with all eleven
+  rytm2_mods mods and cpu-probe: COMP cycles COMP, comp-preview's preview,
+  DUCK; each knob shows its popup and long name; with SRC BD and DEP about 90
+  the other tracks duck on each BD hit, the preview's trace running beside it;
+  DUCK stays shown on leaving the FX track. Not measured: the exact gain
+  curve against the table above.
 
 Credit: hugz202 (AE-analog-rytm-mods, MIT) for the mod.

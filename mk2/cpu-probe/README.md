@@ -48,6 +48,7 @@ Plus `ev_render_in` and `ev_render_out`. RAM: 512 B code, 80 B .bss.
 - Emulator (rytm-emu): the three labels show readouts. Every other screen of
   the walk through GLOBAL > MIDI CONFIG > CHANNELS is pixel-identical to stock.
   The emulator does not model the hardware's timing, so its numbers mean nothing.
-- **Not run on hardware yet.**
+- Hardware, Analog Rytm MKII OS 1.74, 21 Oct 2026, core 0.4: the readouts
+  show beside duck (all eleven rytm2_mods mods) and beside fx-sends.
 
 Credit: hugz202 (AE-analog-rytm-mods, MIT) for the mod; MKII port in this folder.

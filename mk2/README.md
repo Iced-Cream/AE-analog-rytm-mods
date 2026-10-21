@@ -8,17 +8,18 @@ duck and fx-sends add their pages through core-ar2 0.4's page tables
 (`core_pages`, `core_params`), so they link beside rytm2_mods' pages: that
 needs rytm2_mods' lfo-rnd 1.2, voice-dac 1.3, euclid-accents 1.2 and
 velocity-humanise 1.2 or later (v1.2's builds of those four do not link with
-core 0.4).
+core 0.4). duck shares COMP with comp-preview 1.1 or later, through core 0.4's
+page-key lists.
 
 | folder | MK1 mod | what | status |
 |---|---|---|---|
-| [cpu-probe](cpu-probe/README.md) | 0011 | CPU, AUDIO and PEAK readouts on the CHANNELS page | emulator |
-| [duck](duck/README.md) | 0012 | DUCK page behind COMP: VCA ducking keyed by a track | emulator |
-| [fx-sends](fx-sends/README.md) | 0010 | FX SENDS page behind AMP: a chorus send | emulator |
+| [cpu-probe](cpu-probe/README.md) | 0011 | CPU, AUDIO and PEAK readouts on the CHANNELS page | hardware |
+| [duck](duck/README.md) | 0012 | DUCK page behind COMP: VCA ducking keyed by a track | hardware |
+| [fx-sends](fx-sends/README.md) | 0010 | FX SENDS page behind AMP: a chorus send | hardware |
 | TX machines | 0009 | not ported yet | |
 
-"Emulator" means built, linked and checked in rytm-emu; none of these has run
-on a MKII yet. Each README says what was checked and what was not.
+"Hardware" means checked in rytm-emu and then on an Analog Rytm MKII (OS 1.74,
+core-ar2 0.4, 21 Oct 2026). Each README says what was checked and what was not.
 
 ## Building
 

@@ -86,9 +86,13 @@ builds above:
   against VOL 100 differs only in the PRE words (12/13) of the output frames,
   L and R differing (WID 96). POST words are untouched.
 
-**Not checked on hardware:** the sound itself, the level of the return against
-the delay and reverb, the processor load (the MK1 measured about 3,200
-instructions a block with the chorus running: run cpu-probe with a send on to
-see the MKII's figure), and CHR surviving a kit save, a reload and a power
+**Hardware**, Analog Rytm MKII OS 1.74, 21 Oct 2026, core 0.4 with rytm2_mods
+without lfo-rnd, and cpu-probe: CHORUS SEND opens behind AMP with popups and
+long names, CHR on one track gives a chorus on that track only, and VOL changes
+its level; DAC FILTER and the COMP preview work beside it; cpu-probe was read
+with the chorus on.
+
+**Not checked on hardware:** the level of the return against the delay and
+reverb, and CHR surviving a kit save, a reload and a power
 cycle (the same storage path lfo-rnd and voice-dac use, which was
 hardware-tested for them).
