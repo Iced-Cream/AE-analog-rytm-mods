@@ -1,8 +1,8 @@
 # ae-pages (Analog Rytm MKII, OS 1.74)
 
 A small framework the AE MKII ports share: the extra parameter pages they add
-(DUCK behind COMP, FX SENDS behind AMP). On its own it changes nothing the unit
-does.
+(DUCK behind COMP, page 14; FX SENDS behind AMP, page 15). On its own it
+changes nothing the unit does.
 
 On the MK1 those pages share four stock routines through the build's detour
 chains: `page_info`, `page_get_value`, `param_apply_delta` and
@@ -32,7 +32,8 @@ Add a descriptor to the table `ae_pages` (`contribute` in mod.json, `order`
 | +16 | `long text(long id, char *buf)`: 0 if not yours, else write the value's text |
 
 C calling convention. The page's knobs need parameter ids no other mod uses:
-the AE ports use hidden TEST machines' records (DUCK: HH TEST 443..447).
+the AE ports use hidden TEST machines' records (DUCK: HH TEST 443..447;
+FX SENDS: CY TEST 449..456).
 
-Status: built and used by duck in the emulator (page, values, popups). Not
-run on hardware yet.
+Status: built and used by duck and fx-sends in the emulator (pages, values,
+popups), together and with the rytm2_mods v1.2 mods. Not run on hardware yet.
