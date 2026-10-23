@@ -29,7 +29,7 @@ addresses, and the tables are the MK1 mod's, unchanged:
   BD TX-9's ATK is record 349, a stepped picture (BD CLASSIC 2's Transient),
   and both PTC knobs (342, 356, the hidden machines' Tune) print centred,
   -64..63. Once after boot the mod gives ATK record 344's plain slider and
-  both PTCs a plain knob's value text, the fixes the MK1 mod made in v5 and v7.
+  both PTCs a plain knob's value text and dial, the fixes the MK1 mod made in v5 and v7.
 - **Checked in the OS 1.74 code:** BD CLASSIC and SD CLASSIC rewrite their
   voice's whole digital stream every block, so the click and the noise added
   after them never pile up; both mark a new note the way the MK1's did; the
@@ -56,8 +56,11 @@ Emulator (rytm-emu, OS 1.74, 23 Oct 2026, build TX74 and TX74H = TX74 plus
 analoghealth): BD TX-9 is listed only on the BD track and SD TX-9 only on the
 SD track; their SRC pages show the knobs in order with the MK1 defaults; ATK
 turns 0..127 as a slider; notes on both play without a fault; a kit saved
-with both reloads with both. PTC printed centred in that build, which the
-next commit fixes (not yet re-checked). The emulator gave no audio, so
+with both reloads with both. PTC printed centred in that build; with the
+fix (TX7C) both PTCs read 0..127, 64 at the default, and the stock machines
+keep their centred TUN and TRA picture, also after switching a track between
+a TX machine and a stock one. The dial's centre mark went with a later commit
+(not yet re-checked). The emulator gave no audio, so
 nothing audible is checked yet. Next: a unit test with recordings.
 
 Not checked:

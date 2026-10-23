@@ -589,9 +589,9 @@ tx9_noise:
         | of its machine, 16 B each from its OS record (0x419a4888 + 0x54 id):
         |   +0x04 the descriptor, +0x24 the draw, +0x44 the last prototype:
         |         ATK (349) from HLD (344): a 0..127 slider, not TRA's picture
-        |   +0x14 the value text:
+        |   +0x14 the value text, +0x24 the draw:
         |         BD TX-9 PTC (342) from HLD (344), SD TX-9 PTC (356) from DEC
-        |         (351): 0..127, not centred
+        |         (351): 0..127, not centred, and no centre mark on the dial
         .equ    PARAM_INFO,     0x419a4888        | RAM records, 0x54 bytes an id
         .equ    PI_STRIDE,      0x54
 
@@ -615,8 +615,8 @@ tx_machines_tick:
         moveq   #1,%d0
         move.b  %d0,(%a0)
         PI_COPY 349, 344, 0x04, 0x24, 0x44
-        PI_COPY 342, 344, 0x14
-        PI_COPY 356, 351, 0x14
+        PI_COPY 342, 344, 0x14, 0x24
+        PI_COPY 356, 351, 0x14, 0x24
 9:      rts
 
         .include "tables.inc"
