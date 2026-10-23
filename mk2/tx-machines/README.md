@@ -1,14 +1,20 @@
-# TX machines (MKII), 0.1: BD TX-9 and SD TX-9
+# TX machines (MKII), 0.2: all seven machines
 
 Port of [0009-tx-machines](../../mods/0009-tx-machines/design.md) (Analog Rytm
 MK1) to the Analog Rytm MKII, OS 1.74, as an elekloader elemod on core-ar2 0.5.
-This first version has the two TX-9 machines; the other five of the MK1 mod
-(BD TX-9 DIGI, SD TX-8, XT TX-9, XT TX-8, BT TX-8) follow.
+Version 0.1 had the two TX-9 machines (emulator and unit tested, below);
+0.2 adds the other five of the MK1 mod, which so far are only assembled
+(emulator and unit tests pending).
 
 | slot | machine | track | knobs | runs |
 |---|---|---|---|---|
 | 36 | BD TX-9 | BD | LEV PTC DEC TUN DPT ACC WAV ATK | BD CLASSIC, plus the TX-9's click |
 | 37 | SD TX-9 | SD | LEV PTC DEC TON SNP ACC BND DTU | SD CLASSIC, plus the TX-9's own noise |
+| 38 | SD TX-8 | SD | LEV PTC DEC TON SNP ACC DET TRA | SD CLASSIC, plus the TX-8's noise (0.2, untested) |
+| 39 | XT TX-9 | MT, HT | LEV PTC DEC TYP ACC BND NOI TON | XT CLASSIC; TYP picks LT, MT or HT tuning (0.2, untested) |
+| 40 | XT TX-8 | MT, HT | LEV PTC DEC TYP TUN ACC DIO NOI | XT CLASSIC (0.2, untested) |
+| 41 | BD TX-9 DIGI | BD | LEV PTC DEC TUN DPT ACC WAV ATK | BD TX-9 with the digital wave (0.2, untested) |
+| 42 | BT TX-8 | BT | LEV PTC DEC SIG ACC HLD NOI ATK | its own tone and noise on the BT voice (0.2, untested) |
 
 Pick them with the machine knob on the BD and SD tracks, as any machine.
 
@@ -51,6 +57,14 @@ CLASSIC. On 23 Oct 2026 the same machines were recorded on an MKII (stock
 They agree within the recordings' accuracy, so nothing is retuned.
 
 ## Status
+
+**0.2 (the five new machines):** assembled only. Points to check first: TYP
+(records 366 and 374) shows LT/MT/HT through `core_params` and keeps its 0..2
+range after the boot copy of a plain knob's control; each machine lists only
+on its track; BT TX-8 does not use the digital stream (BT CLASSIC clears it
+every block on OS 1.74); CPU with BD TX-9 DIGI.
+
+**0.1 (BD TX-9, SD TX-9):**
 
 **Emulator** (rytm-emu, OS 1.74, 23 Oct 2026, builds TX74 to TX7E): BD TX-9
 is listed only on the BD track and SD TX-9 only on the SD track; their SRC

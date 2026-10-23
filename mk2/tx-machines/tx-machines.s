@@ -52,6 +52,8 @@
 
         .equ    STOCK_BD_CLASSIC, 0x401105c8
         .equ    STOCK_SD_CLASSIC, 0x401179bc
+        .equ    STOCK_XT_CLASSIC, 0x4011b850      | voices 3 and 5 only
+        .equ    STOCK_BT_CLASSIC, 0x4011b5a0      | voice 1 only
         .equ    VOICE_STATE,    0x8000fef8        | per physical voice, 0x20 each
         .equ    VOICE_BUF_A,    0x80006bf8        | stream 1, 0x80 (one block) each
         .equ    MACSR_FRAC,     0x20
@@ -115,6 +117,12 @@
         movem.l (%sp),%d2-%d7/%a2-%a5
         lea     F_SIZE(%sp),%sp
         rts
+        .endm
+
+        | run the stock machine on the block, then return to the interrupt
+        .macro  LEAVE stock
+        CALLSTOCK \stock
+        EXIT
         .endm
 
         | d0 = 33-entry word table \tab at p = \preg
@@ -584,21 +592,698 @@ tx9_noise:
         move.l  (%sp)+,%a6
         rts
 
+        | ==================================================== SD TX-8 (slot 38)
+        | params: LEV 0, PTC 2, DEC 4, TON 6, SNP 8, ACC 10, DET 12, TRA 14
+        .align  2
+tx8sd_machine:
+        ENTER   t8sd_state
+        jsr     ptc_2oct
+        add.l   #TX8SD_TUNOFF,%d4                 | PTC 64 = the TX-8's 250 Hz
+        jsr     clamp_tun
+        PARAM   10,%d3
+        SCALED_LEV t8sd_acc,%d3
+        move.w  %d4,F_BLOCK+2(%sp)                | TUN
+        PARAM   2,%d5
+        LOOKUP  t8sd_body,%d5
+        lsl.l   #8,%d0
+        move.w  %d0,F_BLOCK+4(%sp)                | DEC: body decay from the pitch
+        move.w  12(%a2),F_BLOCK+6(%sp)            | DET
+        move.w  14(%a2),F_BLOCK+8(%sp)            | SNP <- TRA
+        clr.l   F_BLOCK+10(%sp)                   | NOD 0, NOL 0: no stock noise
+        move.w  6(%a2),F_BLOCK+14(%sp)            | BAL <- TON
+        jsr     note_on
+        bne.s   1f
+        moveq   #1,%d0
+        move.l  %d0,n8_state+N8S_TRIG
+1:      CALLSTOCK STOCK_SD_CLASSIC
+        jsr     tx8_noise                         | the TX-8's noise, matched, digital
+        EXIT
+
+        | ---------------------------------------------------- TX-8 SD noise
+        | Matched to the TX-8 SNARE's noise (gen_tx_tables.py noise8): white noise
+        | through a 2-pole high-pass and a 1-pole low-pass fitted to its spectrum,
+        | an instant attack and an exponential decay per block from DEC (its
+        | measured decay times), times SNAP, ACC and LEV. Added into stream 1 like
+        | the TX-9 noise. d6 = voice, a2 = params. Clobbers d0-d7, a0-a5.
+        .equ    N8S_ENV,  0
+        .equ    N8S_X1,   4                       | x1 x2 y1 y2 y3
+        .equ    N8S_SEED, 24
+        .equ    N8S_AMP,  28
+        .equ    N8S_TRIG, 32
+        .align  2
+tx8_noise:
+        move.l  %a6,-(%sp)
+        lea     -16(%sp),%sp                      | 0 count, 4 amp step, 8 LCG mult, 12 out
+        move.l  #1664525,%d0
+        move.l  %d0,8(%sp)
+        move.l  %d6,%d0
+        lsl.l   #7,%d0
+        add.l   #VOICE_BUF_A,%d0
+        move.l  %d0,12(%sp)
+        lea     n8_state,%a4
+        tst.l   N8S_TRIG(%a4)
+        beq.s   1f
+        clr.l   N8S_TRIG(%a4)
+        move.l  #0x7fffffff,%d0
+        move.l  %d0,N8S_ENV(%a4)
+1:      PARAM   8,%d0                             | level = snap(SNP) * acc(ACC), Q15 * Q15
+        lea     n8_snap,%a0
+        jsr     interpw
+        move.l  %d0,%d5
+        PARAM   10,%d0
+        lea     n8_acc,%a0
+        jsr     interpw
+        muls.l  %d0,%d5
+        add.l   %d5,%d5                           | Q31
+        moveq   #0,%d1
+        move.w  0(%a2),%d1                        | * LEV
+        swap    %d1
+        mac.l   %d5,%d1,%acc0
+        movclr.l %acc0,%d5
+        move.l  N8S_ENV(%a4),%d1                  | * envelope
+        mac.l   %d5,%d1,%acc0
+        movclr.l %acc0,%d5
+        PARAM   4,%d0                             | envelope *= decay(DEC)
+        lea     n8_dec,%a0
+        jsr     interpl
+        move.l  N8S_ENV(%a4),%d1
+        mac.l   %d0,%d1,%acc0
+        movclr.l %acc0,%d0
+        move.l  %d0,N8S_ENV(%a4)
+        move.l  N8S_AMP(%a4),%d7                  | ramp from the last block's amplitude
+        move.l  %d5,N8S_AMP(%a4)
+        sub.l   %d7,%d5
+        asr.l   #5,%d5
+        move.l  %d5,4(%sp)
+        movem.l N8S_X1(%a4),%d1-%d5
+        move.l  N8S_SEED(%a4),%d6
+        lea     n8_coef,%a6
+        movem.l (%a6),%a0-%a5
+        movea.l 12(%sp),%a6
+        moveq   #32,%d0
+        move.l  %d0,(%sp)
+2:      move.l  8(%sp),%d0
+        mulu.l  %d0,%d6
+        add.l   #1013904223,%d6
+        move.l  %d6,%d0
+        asr.l   #1,%d0
+        mac.l   %a0,%d0,%acc0
+        mac.l   %a1,%d1,%acc0
+        mac.l   %a2,%d2,%acc0
+        mac.l   %a3,%d3,%acc0
+        mac.l   %a4,%d4,%acc0
+        mac.l   %a5,%d5,%acc0
+        move.l  %d1,%d2
+        move.l  %d0,%d1
+        movclr.l %acc0,%d0
+        add.l   %d0,%d0
+        move.l  %d4,%d5
+        move.l  %d3,%d4
+        move.l  %d0,%d3
+        mac.l   %d0,%d7,%acc1
+        movclr.l %acc1,%d0
+        add.l   %d0,%d0
+        add.l   %d0,(%a6)+
+        add.l   4(%sp),%d7
+        subq.l  #1,(%sp)
+        bne.s   2b
+        lea     n8_state,%a4
+        movem.l %d1-%d5,N8S_X1(%a4)
+        move.l  %d6,N8S_SEED(%a4)
+        lea     16(%sp),%sp
+        move.l  (%sp)+,%a6
+        rts
+
+        .align  4
+
+        | ==================================================== XT TX-9 (slot 39)
+        | params: LEV 0, PTC 2, DEC 4, TYP 6, ACC 8, BND 10, NOI 12, TON 14
+        | XT CLASSIC: LEV TUN DEC SWD SWT NOD NOL TON
+        | state:  e (bend envelope, Q31)
+        .align  2
+tx9xt_machine:
+        ENTER   x9_state
+        PARAM   2,%d2                             | PTC
+        jsr     note_on
+        bne.s   1f
+        move.l  #0x7fffffff,(%a3)
+        clr.l   4(%a3)
+1:      LOOKUP  x9_ptc,%d2
+        move.l  %d0,%d4                           | TUN, TYPE 1
+        moveq   #0,%d0
+        move.w  6(%a2),%d0
+        lsr.l   #8,%d0                            | TYPE 0..2 (LT MT HT)
+        moveq   #2,%d1
+        cmp.l   %d1,%d0
+        bls.s   2f
+        move.l  %d1,%d0
+2:      move.l  %d0,%d5
+        lea     x9_typ,%a0
+        add.l   %d0,%d0
+        move.w  (%a0,%d0.l),%d1
+        ext.l   %d1
+        add.l   %d1,%d4
+        PARAM   4,%d2                             | DEC: a flat start at the longest
+        LOOKUP  x9_hold,%d2                       | damping, then the tail's DEC word
+        tst.l   %d5                               | from DEC and the steady pitch
+        beq.s   3f
+        moveq   #11,%d1                           | TYPE 1, 2: 0.68x as long
+        mulu.l  %d1,%d0
+        lsr.l   #4,%d0
+3:      move.l  4(%a3),%d1
+        addq.l  #1,4(%a3)
+        cmp.l   %d0,%d1
+        bge.s   4f
+        move.l  #0x7f00,%d0
+        bra.s   6f
+4:      LOOKUP  x9_dec,%d2
+        move.l  #X9_B,%d3
+        add.l   %d0,%d3
+        tst.l   %d5
+        beq.s   5f
+        moveq   #X9_TOFF,%d0
+        add.l   %d0,%d3
+5:      move.l  #X9_KP,%d1
+        jsr     xt_dec
+6:      move.w  %d0,F_BLOCK+4(%sp)
+        PARAM   10,%d3                            | bend: start(BND) * e
+        LOOKUP  x9_bnd,%d3
+        move.l  (%a3),%d1
+        clr.w   %d1
+        swap    %d1
+        muls.l  %d1,%d0
+        moveq   #15,%d1
+        asr.l   %d1,%d0
+        add.l   %d0,%d4
+        jsr     clamp_tun
+        move.l  (%a3),%d1
+        move.l  #X9_BDEC,%d0
+        mac.l   %d0,%d1,%acc0
+        movclr.l %acc0,%d0
+        move.l  %d0,(%a3)
+        PARAM   8,%d3
+        SCALED_LEV x9_acc,%d3
+        move.w  %d4,F_BLOCK+2(%sp)                | TUN
+        clr.w   F_BLOCK+6(%sp)                    | SWD 0: the bend is ours
+        clr.w   F_BLOCK+8(%sp)                    | SWT 0
+        move.w  #X9_NOD,%d0
+        move.w  %d0,F_BLOCK+10(%sp)               | NOD: the TX-9's ~40 ms
+        PARAM   12,%d5
+        LOOKUP  x9_nol,%d5
+        lsl.l   #8,%d0
+        move.w  %d0,F_BLOCK+12(%sp)               | NOL <- NOI
+        move.w  14(%a2),F_BLOCK+14(%sp)           | TON
+        CALLSTOCK STOCK_XT_CLASSIC
+        jsr     x9_sub                            | + the second partial (2/3 f)
+        EXIT
+
+
+        | ==================================================== XT TX-8 (slot 40)
+        | params: LEV 0, PTC 2, DEC 4, TYP 6, TUN 8, ACC 10, DIO 12, NOI 14
+        .align  2
+tx8xt_machine:
+        ENTER   x8_state
+        jsr     note_on
+        bne.s   1f
+        move.l  #0x7fffffff,(%a3)
+1:      moveq   #0,%d0
+        move.w  6(%a2),%d0
+        lsr.l   #8,%d0                            | TYPE 0..2 (LT MT HT)
+        moveq   #2,%d1
+        cmp.l   %d1,%d0
+        bls.s   2f
+        move.l  %d1,%d0
+2:      lea     x8_typ,%a0
+        add.l   %d0,%d0
+        move.w  (%a0,%d0.l),%d4
+        ext.l   %d4                               | TUN of the TYPE at PTC 64
+        moveq   #0,%d0                            | + 96 per PTC step: 2 octaves
+        move.w  2(%a2),%d0
+        sub.l   #0x4000,%d0
+        move.l  %d0,%d1
+        add.l   %d0,%d0
+        add.l   %d1,%d0
+        asr.l   #3,%d0
+        add.l   %d0,%d4
+        PARAM   8,%d2                             | + fine TUNE
+        LOOKUP  x8_tune,%d2
+        add.l   %d0,%d4
+        move.l  #X8_B,%d3
+        PARAM   4,%d2                             | DEC word from DEC and the pitch
+        LOOKUP  x8_dec,%d2
+        add.l   %d0,%d3
+        move.l  #X8_KP,%d1
+        jsr     xt_dec
+        move.w  %d0,F_BLOCK+4(%sp)
+        PARAM   12,%d2                            | + diode droop * e
+        LOOKUP  x8_diod,%d2
+        move.l  (%a3),%d1
+        clr.w   %d1
+        swap    %d1
+        muls.l  %d1,%d0
+        moveq   #15,%d1
+        asr.l   %d1,%d0
+        add.l   %d0,%d4
+        jsr     clamp_tun
+        move.l  (%a3),%d1
+        move.l  #X8_DDEC,%d0
+        mac.l   %d0,%d1,%acc0
+        movclr.l %acc0,%d0
+        move.l  %d0,(%a3)
+        PARAM   10,%d3
+        SCALED_LEV x8_acc,%d3
+        move.w  %d4,F_BLOCK+2(%sp)                | TUN
+        clr.w   F_BLOCK+6(%sp)                    | SWD 0
+        clr.w   F_BLOCK+8(%sp)                    | SWT 0
+        move.w  #X8_NOD,%d0
+        move.w  %d0,F_BLOCK+10(%sp)               | NOD: the TX-8's short noise
+        PARAM   14,%d5
+        LOOKUP  x8_nol,%d5
+        lsl.l   #8,%d0
+        move.w  %d0,F_BLOCK+12(%sp)               | NOL <- NOI
+        move.w  #0x4000,%d0
+        move.w  %d0,F_BLOCK+14(%sp)               | TON: XT CLASSIC's default
+        LEAVE   STOCK_XT_CLASSIC
+
+        | ==================================================== BT TX-8 (slot 42)
+        | The TX-8 BD on the BT voice's resonator: BT CLASSIC run every block, the
+        | 808's sigh and attack step on its TUN (a quarter semitone per step), its
+        | decay matched through BT DEC with a share for the pitch (gen_tx_tables.py
+        | bt8, from recordings of BT CLASSIC and the Machinedrum).
+        | params: LEV 0, PTC 2, DEC 4, SIG 6, ACC 8, HLD 10, NOI 12, ATK 14
+        | BT CLASSIC: LEV TUN DEC - NOL SNP SWD -
+        | state:  blocks since the note
+        .align  2
+bt8_machine:
+        ENTER   b8_state
+        jsr     note_on
+        bne.s   1f
+        clr.l   (%a3)
+1:      moveq   #0,%d4                            | TUN: 3/4 step per PTC step,
+        move.w  2(%a2),%d4                        | two octaves over PTC
+        sub.l   #0x4000,%d4
+        move.l  %d4,%d0
+        add.l   %d4,%d4
+        add.l   %d0,%d4
+        asr.l   #2,%d4
+        add.l   #BT8_TUNOFF,%d4
+        move.l  (%a3),%d5                         | the sigh, as BD TX-8's, x4
+        cmp.l   #T8_SIGH_BLOCKS,%d5
+        bge.s   2f
+        PARAM   6,%d2
+        LOOKUP  t8bd_sig,%d2
+        move.l  #T8_SIGH_BLOCKS,%d1
+        sub.l   %d5,%d1
+        muls.l  %d1,%d0
+        move.l  #T8_SIGH_RECIP,%d1
+        muls.l  %d1,%d0
+        swap    %d0
+        ext.l   %d0
+        lsl.l   #2,%d0
+        add.l   %d0,%d4
+2:      PARAM   14,%d2                            | the attack: ~2.2x the pitch for
+        move.l  #T8_ATK_BLK,%d1                   | the first ATK * 0.067 ms
+        mulu.l  %d1,%d2
+        moveq   #7,%d1
+        lsr.l   %d1,%d2
+        cmp.l   (%a3),%d2
+        blt.s   3f
+        add.l   #4*T8_ATK_TUN,%d4
+3:      jsr     clamp_tun
+        PARAM   8,%d3
+        SCALED_LEV t8bd_acc,%d3
+        move.w  %d4,F_BLOCK+2(%sp)                | TUN
+        PARAM   10,%d0                            | HLD: the longest decay for the
+        cmp.l   (%a3),%d0                         | first HLD blocks
+        ble.s   4f
+        move.l  #0x7f00,%d0
+        bra.s   7f
+4:      PARAM   4,%d5
+        LOOKUP  b8_dec,%d5
+        move.l  %d0,%d5
+        PARAM   2,%d2
+        LOOKUP  b8_dq,%d2                         | + the pitch's share
+        add.l   %d5,%d0
+        bge.s   5f
+        moveq   #0,%d0
+5:      cmp.l   #127,%d0
+        ble.s   6f
+        moveq   #127,%d0
+6:      lsl.l   #8,%d0
+7:      move.w  %d0,F_BLOCK+4(%sp)                | DEC
+        clr.w   F_BLOCK+6(%sp)
+        move.w  12(%a2),F_BLOCK+8(%sp)            | NOL <- NOI
+        clr.l   F_BLOCK+10(%sp)                   | SNP 0 (the attack is ours), SWD 0
+        clr.w   F_BLOCK+14(%sp)
+        addq.l  #1,(%a3)
+        LEAVE   STOCK_BT_CLASSIC
+
+
+        | ==================================================== BD TX-9 DIGI (slot 41)
+        | The TX-9 kick made digitally: an oscillator with the TX-9's pitch sweep,
+        | hold and decay, written into the BD voice's digital input (stream 1, the
+        | path samples take, so the track's filter, overdrive and AMP page still
+        | apply). BD CLASSIC runs underneath at LEV 0 (silent; it keeps the voice's
+        | own housekeeping, and it rewrites stream 1 every block, so this adds).
+        | params: as BD TX-9 - LEV 0, PTC 2, DEC 4, TUN 6, DPT 8, ACC 10, WAV 12, ATK 14
+        |   WAV 0 a pure sine, 1 the Machinedrum's (sine + its 2nd harmonic at
+        |   -26 dB, as recorded), 2 a triangle
+        | The sine: s = 4x(1 - |x|), refined by s (0.775 + 0.225 |s|) (harmonics
+        | near -50 dB). Pitch = 56 Hz * 2^((PTC - 64) / 64) * (1 + K(DPT) e), e the
+        | TX-9's sweep envelope (BD TX-9's tables); level = TX-9 amplitude(ACC) *
+        | LEV * env, env held for the TX-9's hold (ACC) then falling at the TX-9's
+        | rate for DEC. Phase and gain glide sample by sample across the block.
+        | state: d9_state (as BD TX-9's: e, the click's position), d9_ext (voice 0).
+        .equ    D9_ENV,  0                        | amplitude envelope, Q31
+        .equ    D9_HOLD, 4                        | blocks of hold left
+        .equ    D9_PH,   8                        | oscillator phase
+        .equ    D9_INC,  12                       | phase step at the last block's end (0: a new note)
+        .equ    D9_G,    16                       | gain at the last block's end, Q31
+        .align  2
+tx9d_machine:
+        ENTER   d9_state
+        lea     d9_ext,%a4
+        PARAM   6,%d2                             | TUN
+        PARAM   10,%d3                            | ACC
+        jsr     note_on
+        bne.s   1f
+        lea     t9bd_e0,%a0                       | a note: the TX-9's envelopes restart
+        move.l  %d2,%d0
+        jsr     interpl
+        move.l  %d0,(%a3)
+        clr.l   4(%a3)
+        move.l  #0x7fffffff,%d0
+        move.l  %d0,D9_ENV(%a4)
+        LOOKUP  t9bd_hld,%d3
+        move.l  %d0,D9_HOLD(%a4)
+        clr.l   D9_PH(%a4)
+        clr.l   D9_INC(%a4)
+1:      clr.l   F_BLOCK+0(%sp)                    | BD CLASSIC, silent: LEV 0, TUN 0,
+        clr.l   F_BLOCK+4(%sp)                    | DEC 0, HLD 0, no sweep, WAV 0,
+        clr.l   F_BLOCK+8(%sp)                    | TRA 0
+        clr.l   F_BLOCK+12(%sp)
+        CALLSTOCK STOCK_BD_CLASSIC
+        move.l  D9_ENV(%a4),%d0
+        cmp.l   #0x00010000,%d0                   | died (or never played): only the
+        bcs.w   9f                                | click, if any
+        | the phase step at the block's end: base(PTC) * (1 + K e), and e decays
+        PARAM   2,%d0
+        lea     d9_inc,%a0
+        jsr     interpl
+        lsr.l   #8,%d0
+        move.l  %d0,%d5                           | base >> 8
+        PARAM   8,%d0                             | DPT -> K, Q12
+        move.l  #TX9_KSTEP,%d1
+        mulu.l  %d1,%d0
+        lsr.l   #8,%d0
+        move.l  (%a3),%d1
+        clr.w   %d1
+        swap    %d1                               | e, Q15
+        mulu.l  %d1,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        add.l   #4096,%d0                         | 1 + K e, Q12
+        mulu.l  %d0,%d5
+        lsr.l   #4,%d5
+        lea     t9bd_cb,%a0                       | e *= cb(TUN)
+        move.l  %d2,%d0
+        jsr     interpl
+        move.l  (%a3),%d1
+        mac.l   %d0,%d1,%acc0
+        movclr.l %acc0,%d0
+        move.l  %d0,(%a3)
+        | the envelope: the hold, then the decay for DEC
+        move.l  D9_HOLD(%a4),%d0
+        beq.s   2f
+        subq.l  #1,D9_HOLD(%a4)
+        bra.s   3f
+2:      PARAM   4,%d0
+        lea     d9_dec,%a0
+        jsr     interpl
+        move.l  D9_ENV(%a4),%d1
+        mac.l   %d0,%d1,%acc0
+        movclr.l %acc0,%d0
+        move.l  %d0,D9_ENV(%a4)
+3:      LOOKUP  d9_amp,%d3                        | gain = amp(ACC) * env * LEV, Q31
+        move.l  D9_ENV(%a4),%d1
+        clr.w   %d1
+        swap    %d1
+        mulu.l  %d1,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        moveq   #0,%d1
+        move.w  0(%a2),%d1
+        mulu.l  %d1,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        swap    %d0
+        clr.w   %d0
+        move.l  D9_G(%a4),%d3                     | glide from the last block's end
+        move.l  %d0,D9_G(%a4)
+        move.l  D9_INC(%a4),%d4
+        move.l  %d5,D9_INC(%a4)
+        tst.l   %d4
+        bne.s   4f
+        move.l  %d5,%d4                           | a note's first block: no glide
+        move.l  %d0,%d3
+4:      sub.l   %d3,%d0
+        asr.l   #5,%d0
+        move.l  %d0,%a5                           | gain step
+        sub.l   %d4,%d5
+        asr.l   #5,%d5                            | phase step's step
+        move.l  %d6,%d0
+        lsl.l   #7,%d0
+        add.l   #VOICE_BUF_A,%d0
+        movea.l %d0,%a0
+        PARAM   12,%d6                            | WAV
+        movea.l #32767,%a1                        | the clamp
+        move.l  D9_PH(%a4),%d2
+        moveq   #32,%d7
+5:      add.l   %d5,%d4
+        add.l   %d4,%d2
+        move.l  %d2,%d0
+        swap    %d0
+        ext.l   %d0                               | x, Q15: -1 .. 1 over a cycle
+        moveq   #2,%d1
+        cmp.l   %d1,%d6
+        beq.s   7f
+        move.l  %d0,%d1                           | the sine: s = 4x(1 - |x|)
+        bpl.s   51f
+        neg.l   %d1
+51:     sub.l   #32768,%d1
+        muls.l  %d1,%d0
+        neg.l   %d0
+        asr.l   #8,%d0
+        asr.l   #5,%d0                            | s, Q15
+        move.l  %d0,%d1                           | * (0.775 + 0.225 |s|)
+        bpl.s   52f
+        neg.l   %d1
+52:     mulu.w  #14746,%d1
+        swap    %d1
+        and.l   #0xffff,%d1
+        add.l   #25395,%d1
+        muls.l  %d1,%d0
+        moveq   #15,%d1
+        asr.l   %d1,%d0                           | (32768 at most: muls.w below
+        tst.l   %d6                               | squares it the same either way)
+        beq.s   8f
+        move.l  %d0,%d1                           | WAV 1: + 0.1 y^2 - 0.05, the
+        muls.w  %d0,%d1                           | Machinedrum's 2nd harmonic
+        swap    %d1
+        mulu.w  #6554,%d1
+        lsr.l   #8,%d1
+        lsr.l   #7,%d1
+        sub.l   #1638,%d1
+        add.l   %d1,%d0
+        bra.s   8f
+7:      move.l  %d0,%d1                           | WAV 2: a triangle, in phase
+        bpl.s   71f
+        neg.l   %d1
+71:     cmp.l   #16384,%d1
+        ble.s   72f
+        neg.l   %d1
+        add.l   #32768,%d1
+72:     add.l   %d1,%d1
+        tst.l   %d0
+        bpl.s   73f
+        neg.l   %d1
+73:     move.l  %d1,%d0
+8:      cmp.l   %a1,%d0                           | clamp to +-32767 (a1 = 32767)
+        ble.s   81f
+        move.l  %a1,%d0
+81:     neg.l   %d0
+        cmp.l   %a1,%d0
+        ble.s   82f
+        move.l  %a1,%d0
+82:     neg.l   %d0
+        swap    %d0
+        clr.w   %d0                               | y, Q31
+        mac.l   %d0,%d3,%acc0
+        movclr.l %acc0,%d0
+        add.l   %d0,(%a0)+
+        add.l   %a5,%d3
+        subq.l  #1,%d7
+        bne.w   5b
+        move.l  %d2,D9_PH(%a4)
+9:      move.l  A_VOICE(%sp),%d6
+        jsr     t9_attack                         | the TX-9 click, as BD TX-9's
+        EXIT
+
+        | d0 = XT CLASSIC DEC word for idx d3 + (d4 * d1 >> 16): d4 the TUN word
+        | sent, d1 the pitch slope (see xt_dec in gen_tx_tables.py). Shared by both
+        | toms. Clobbers d1, d3, d7, a0.
+        .align  2
+xt_dec:
+        move.l  %d4,%d0
+        muls.l  %d1,%d0
+        moveq   #16,%d1
+        asr.l   %d1,%d0
+        add.l   %d0,%d3
+        bge.s   1f
+        moveq   #0,%d3
+1:      moveq   #127,%d0
+        cmp.l   %d0,%d3
+        ble.s   2f
+        move.l  %d0,%d3
+2:      lea     xt_dxt,%a0
+        move.l  %d3,%d0
+        jmp     interpw
+
+        | ==================================================== TX-9 tom partial
+        | The 909 tom's second partial: a sine at 2/3 of the pitch being sent (d4,
+        | the XT TUN word, bend included), decaying a little slower than the main
+        | (x9_sd for DEC; TYPE 1, 2 x1.47 faster), written into stream 1 - the
+        | path the BD attacks and SD noises take. v7 added it into buffer B (XT
+        | CLASSIC's noise buffer) and it was not heard on the hardware. Nothing
+        | stock writes A on the tom voices, so the partial is stored, not added,
+        | and once it has died the block is written as zeros (no stale block can
+        | loop). The sine is a parabola: s = 4 x (1 - |x|). Called after the stock
+        | call: d4 TUN, d6 voice, a2 params, a3 x9_state slot (+4: blocks since the
+        | note, 1 on the first). Clobbers d0-d3, d5, d7, a0, a4.
+        .align  2
+x9_sub:
+        lea     x9sub_state,%a4                   | env (Q31), phase
+        move.l  %d6,%d0
+        lsl.l   #3,%d0
+        add.l   %d0,%a4
+        moveq   #1,%d0
+        cmp.l   4(%a3),%d0
+        bne.s   1f
+        move.l  #0x7fffffff,(%a4)
+        clr.l   4(%a4)
+1:      move.l  (%a4),%d5
+        bne.s   10f                               | 0: died, its zero block written
+        rts
+10:     cmp.l   #0x00200000,%d5                   | done below -60 dB: G = 0, the
+        bge.s   6f                                | loop writes one block of zeros,
+        moveq   #0,%d5                            | and env = 0 stops it until the
+        clr.l   (%a4)                             | next note
+        bra.w   7f
+6:
+        PARAM   4,%d2                             | env *= 1 - d
+        LOOKUP  x9_sd,%d2
+        moveq   #10,%d1
+        lsl.l   %d1,%d0
+        moveq   #0,%d1
+        move.w  6(%a2),%d1
+        lsr.l   #8,%d1
+        beq.s   2f
+        move.l  %d0,%d1                           | TYPE 1, 2: d * 1.47
+        moveq   #15,%d7
+        mulu.l  %d7,%d1
+        lsr.l   #5,%d1
+        add.l   %d1,%d0
+2:      mac.l   %d5,%d0,%acc0
+        movclr.l %acc0,%d1
+        sub.l   %d1,%d5
+        move.l  %d5,(%a4)
+        PARAM   8,%d2                             | G = K * acc^2 * LEV * env
+        LOOKUP  x9_acc,%d2
+        mulu.l  %d0,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        move.l  #X9S_K,%d1
+        mulu.l  %d1,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        moveq   #0,%d1
+        move.w  0(%a2),%d1
+        mulu.l  %d1,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        move.l  %d5,%d1
+        swap    %d1
+        and.l   #0xffff,%d1
+        mulu.l  %d1,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        cmp.l   #65000,%d0
+        bls.s   3f
+        move.l  #65000,%d0
+3:      move.l  %d0,%d5
+7:      move.l  %d4,%d0                           | phase step from TUN
+        moveq   #10,%d1
+        lsr.l   %d1,%d0
+        lea     x9_sinc,%a0
+        lsl.l   #2,%d0
+        add.l   %d0,%a0
+        move.l  (%a0),%d3
+        move.l  4(%a0),%d0
+        sub.l   %d3,%d0
+        asr.l   #4,%d0
+        move.l  %d4,%d1
+        and.l   #0x3ff,%d1
+        muls.l  %d1,%d0
+        asr.l   #6,%d0
+        add.l   %d0,%d3
+        move.l  %d6,%d0
+        lsl.l   #7,%d0
+        add.l   #VOICE_BUF_A,%d0
+        movea.l %d0,%a0
+        move.l  4(%a4),%d2
+        moveq   #32,%d7
+4:      add.l   %d3,%d2
+        move.l  %d2,%d0
+        swap    %d0
+        ext.l   %d0                               | x, Q15
+        move.l  %d0,%d1
+        bpl.s   5f
+        neg.l   %d1
+5:      sub.l   #32768,%d1                        | |x| - 1
+        muls.l  %d1,%d0
+        neg.l   %d0                               | x (1 - |x|), Q30 / 4
+        asr.l   #8,%d0
+        asr.l   #5,%d0                            | s, Q15
+        muls.l  %d5,%d0
+        move.l  %d0,(%a0)+
+        subq.l  #1,%d7
+        bne.s   4b
+        move.l  %d2,4(%a4)
+        rts
+
         | ev_tick, until done once (the records are built at boot, before the
-        | first tick): each knob below takes a plain knob's parts from a donor
-        | of its machine, 16 B each from its OS record (0x419a4888 + 0x54 id):
-        |   +0x04 the descriptor, +0x24 the draw, +0x44 the last prototype:
-        |         ATK (349) from HLD (344): a 0..127 slider, not TRA's picture
-        |   +0x14 the value text, +0x24 the draw:
-        |         BD TX-9 PTC (342) from HLD (344), SD TX-9 PTC (356) from DEC
-        |         (351): 0..127, not centred, and no centre mark on the dial
+        | first tick): the knobs whose OS control is not a plain 0..127 one (a
+        | centred Tune, Balance or Symmetry, a stepped Transient picture) take a
+        | plain knob's whole control from a donor of their machine, 16 B each
+        | from its OS record (0x419a4888 + 0x54 id): +0x04 the descriptor, +0x14
+        | the value text, +0x24 the draw, +0x44 the last prototype. The MK1 mod
+        | did the same for the same ids (v5 and v7), so every TX knob reads
+        | 0..127 as the Machinedrum's do.
+        |   BD TX-9     ATK 349, PTC 342                 from HLD 344
+        |   SD TX-9     PTC 356                          from DEC 351
+        |   SD TX-8     PTC 358, TRA 359                 from DEC 361
+        |   XT TX-9     PTC 372                          from DEC 367
+        |   XT TX-8     PTC 376, TYP 374, TUN 377, ACC 381  from DEC 375
+        |   BD TX-9 DIGI  PTC 382, ATK 389               from DEC 385
+        |   BT TX-8     PTC 390, SIG 392                 from DEC 393
+        | The two TYP knobs (366, 374) then print LT / MT / HT (tx_typ_text).
         .equ    PARAM_INFO,     0x419a4888        | RAM records, 0x54 bytes an id
         .equ    PI_STRIDE,      0x54
 
-        .macro  PI_COPY dst, src, offs:vararg
+        .macro  PI_COPY dst, src
         lea     PARAM_INFO+\src*PI_STRIDE,%a0
         lea     PARAM_INFO+\dst*PI_STRIDE,%a1
-        .irp    off, \offs
+        .irp    off, 0x04, 0x14, 0x24, 0x44
         move.l  \off(%a0),\off(%a1)
         move.l  \off+4(%a0),\off+4(%a1)
         move.l  \off+8(%a0),\off+8(%a1)
@@ -614,10 +1299,48 @@ tx_machines_tick:
         bne.w   9f
         moveq   #1,%d0
         move.b  %d0,(%a0)
-        PI_COPY 349, 344, 0x04, 0x24, 0x44
-        PI_COPY 342, 344, 0x14, 0x24
-        PI_COPY 356, 351, 0x14, 0x24
+        PI_COPY 349, 344
+        PI_COPY 342, 344
+        PI_COPY 356, 351
+        PI_COPY 358, 361
+        PI_COPY 359, 361
+        PI_COPY 372, 367
+        PI_COPY 376, 375
+        PI_COPY 374, 375
+        PI_COPY 377, 375
+        PI_COPY 381, 375
+        PI_COPY 382, 385
+        PI_COPY 389, 385
+        PI_COPY 390, 393
+        PI_COPY 392, 393
 9:      rts
+
+        | int tx_typ_text(struct core_text *t): core-ar2's core_params text
+        | callback for the two TYP knobs: LT, MT or HT for 0, 1, 2 (above 2: HT).
+        | t: +8 the value (8.8), +12 the buffer. Returns 1 (CORE_TEXT_DONE).
+        .globl  tx_typ_text
+        .align  2
+tx_typ_text:
+        move.l  4(%sp),%a0
+        move.l  8(%a0),%d0
+        asr.l   #8,%d0
+        bpl.s   1f
+        moveq   #0,%d0
+1:      moveq   #2,%d1
+        cmp.l   %d1,%d0
+        ble.s   2f
+        move.l  %d1,%d0
+2:      move.l  12(%a0),%a1
+        lea     typ_names,%a0
+        add.l   %d0,%d0
+        add.l   %d0,%a0
+        move.b  #'T',1(%a1)
+        move.b  (%a0),(%a1)
+        clr.b   2(%a1)
+        moveq   #1,%d0
+        rts
+typ_names:      .ascii  "LMH"
+        .align  2
 
         .include "tables.inc"
 
@@ -662,6 +1385,119 @@ tx_machines_sd9:
         KNOB    str_bend, str_bnd, 0, 127, 64, 0
         KNOB    str_detune, str_dtu, 0, 127, 64, 0
 
+        .align  4
+        .globl  tx_machines_sd8
+tx_machines_sd8:
+        .long   38, tx8sd_machine
+        .byte   1, 0x04                           | SD track, SD voice
+        .short  0
+        .long   str_sdt8, str_sdt8s
+        KNOB    str_level, str_lev, 0, 127, 100, 0
+        KNOB    str_pitch, str_ptc, 0, 127, 64, 0
+        KNOB    str_decay, str_dec, 0, 127, 64, 0
+        KNOB    str_tone, str_ton, 0, 127, 64, 0
+        KNOB    str_snappy, str_snp, 0, 127, 64, 0
+        KNOB    str_accent, str_acc, 0, 127, 96, 0
+        KNOB    str_detune, str_det, 0, 32, 12, 0
+        KNOB    str_trans, str_tra, 0, 127, 64, 0
+
+        .align  4
+        .globl  tx_machines_xt9
+tx_machines_xt9:
+        .long   39, tx9xt_machine
+        .byte   -1, 0x28                          | listed as XT CLASSIC is; LT, MT/HT voices
+        .short  0
+        .long   str_xtt9, str_xtt9s
+        KNOB    str_level, str_lev, 0, 127, 100, 0
+        KNOB    str_pitch, str_ptc, 0, 127, 64, 0
+        KNOB    str_decay, str_dec, 0, 127, 64, 0
+        KNOB    str_type, str_typ, 0, 2, 1, 0
+        KNOB    str_accent, str_acc, 0, 127, 96, 0
+        KNOB    str_bend, str_bnd, 0, 127, 64, 0
+        KNOB    str_noise, str_noi, 0, 127, 64, 0
+        KNOB    str_ntone, str_ton, 0, 127, 64, 0
+
+        .align  4
+        .globl  tx_machines_xt8
+tx_machines_xt8:
+        .long   40, tx8xt_machine
+        .byte   -1, 0x28
+        .short  0
+        .long   str_xtt8, str_xtt8s
+        KNOB    str_level, str_lev, 0, 127, 100, 0
+        KNOB    str_pitch, str_ptc, 0, 127, 64, 0
+        KNOB    str_decay, str_dec, 0, 127, 64, 0
+        KNOB    str_type, str_typ, 0, 2, 1, 0
+        KNOB    str_tune, str_tun, 0, 127, 64, 0
+        KNOB    str_accent, str_acc, 0, 127, 96, 0
+        KNOB    str_diode, str_dio, 0, 127, 64, 0
+        KNOB    str_noise, str_noi, 0, 127, 64, 0
+
+        .align  4
+        .globl  tx_machines_bd9d
+tx_machines_bd9d:
+        .long   41, tx9d_machine
+        .byte   0, 0x01                           | BD track, BD voice
+        .short  0
+        .long   str_bd9d, str_bd9ds
+        KNOB    str_level, str_lev, 0, 127, 100, 0
+        KNOB    str_pitch, str_ptc, 0, 127, 64, 0
+        KNOB    str_decay, str_dec, 0, 127, 64, 0
+        KNOB    str_swt, str_tun, 0, 127, 64, 0
+        KNOB    str_swd, str_dpt, 0, 127, 64, 0
+        KNOB    str_accent, str_acc, 0, 127, 96, 0
+        KNOB    str_wave, str_wav, 0, 2, 1, 0
+        KNOB    str_attack, str_atk, 0, 127, 64, 0
+
+        .align  4
+        .globl  tx_machines_bt8
+tx_machines_bt8:
+        .long   42, bt8_machine
+        .byte   -1, 0x02                          | listed as XT CLASSIC is (the MK1
+        .short  0                                 | found BT's category unlisted); BT voice
+        .long   str_btt8, str_btt8s
+        KNOB    str_level, str_lev, 0, 127, 100, 0
+        KNOB    str_pitch, str_ptc, 0, 127, 64, 0
+        KNOB    str_decay, str_dec, 0, 127, 64, 0
+        KNOB    str_sigh, str_sig, 0, 127, 64, 0
+        KNOB    str_accent, str_acc, 0, 127, 96, 0
+        KNOB    str_hold, str_hld, 0, 127, 0, 0
+        KNOB    str_noise, str_noi, 0, 127, 0, 0
+        KNOB    str_attack, str_atk, 0, 127, 64, 0
+
+        | core_params: the TYP knobs' text (XT TX-9 366, XT TX-8 374)
+        .align  4
+        .globl  tx_machines_typ9, tx_machines_typ8
+tx_machines_typ9:
+        .long   366, 366, 0, 0, tx_typ_text
+tx_machines_typ8:
+        .long   374, 374, 0, 0, tx_typ_text
+
+str_sdt8:       .asciz  "SD TX-8"
+str_sdt8s:      .asciz  "SDT8"
+str_xtt9:       .asciz  "XT TX-9"
+str_xtt9s:      .asciz  "XTT9"
+str_xtt8:       .asciz  "XT TX-8"
+str_xtt8s:      .asciz  "XTT8"
+str_bd9d:       .asciz  "BD TX-9 DIGI"
+str_bd9ds:      .asciz  "BD9D"
+str_btt8:       .asciz  "BT TX-8"
+str_btt8s:      .asciz  "BTT8"
+str_det:        .asciz  "DET"
+str_trans:      .asciz  "Transient"
+str_tra:        .asciz  "TRA"
+str_type:       .asciz  "Type"
+str_typ:        .asciz  "TYP"
+str_noise:      .asciz  "Noise"
+str_noi:        .asciz  "NOI"
+str_ntone:      .asciz  "Noise Tone"
+str_tune:       .asciz  "Tune"
+str_diode:      .asciz  "Diode"
+str_dio:        .asciz  "DIO"
+str_sigh:       .asciz  "Sigh"
+str_sig:        .asciz  "SIG"
+str_hold:       .asciz  "Hold Time"
+str_hld:        .asciz  "HLD"
 str_bdt9:       .asciz  "BD TX-9"
 str_bdt9s:      .asciz  "BDT9"
 str_sdt9:       .asciz  "SD TX-9"
@@ -695,9 +1531,17 @@ str_dtu:        .asciz  "DTU"
         .data
         .align  4
 n9_state:       .long   0, 0, 0, 0, 0, 0, 0, 0, 0, 0x35a7c100, 0, 0   | E C cnt ph x1 x2 y1 y2 y3 seed amp trig
+n8_state:       .long   0, 0, 0, 0, 0, 0, 0x2468ace1, 0, 0   | env x1 x2 y1 y2 y3 seed amp trig
 
         .bss
         .align  4
 tx_ready:       .space  4
 t9bd_state:     .space  8 * 8
 t9sd_state:     .space  8 * 8
+t8sd_state:     .space  8 * 8
+x9_state:       .space  8 * 8
+x9sub_state:    .space  8 * 8
+x8_state:       .space  8 * 8
+b8_state:       .space  8 * 8
+d9_state:       .space  8 * 8
+d9_ext:         .space  20                        | voice 0 only: the mask allows no other
