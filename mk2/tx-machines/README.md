@@ -52,22 +52,40 @@ They agree within the recordings' accuracy, so nothing is retuned.
 
 ## Status
 
-Emulator (rytm-emu, OS 1.74, 23 Oct 2026, build TX74 and TX74H = TX74 plus
-analoghealth): BD TX-9 is listed only on the BD track and SD TX-9 only on the
-SD track; their SRC pages show the knobs in order with the MK1 defaults; ATK
-turns 0..127 as a slider; notes on both play without a fault; a kit saved
-with both reloads with both. PTC printed centred in that build; with the
-fix (TX7C) both PTCs read 0..127, 64 at the default, and the stock machines
-keep their centred TUN and TRA picture, also after switching a track between
-a TX machine and a stock one. The dial's centre mark went with a later commit
-(not yet re-checked). The emulator gave no audio, so
-nothing audible is checked yet. Next: a unit test with recordings.
+**Emulator** (rytm-emu, OS 1.74, 23 Oct 2026, builds TX74 to TX7E): BD TX-9
+is listed only on the BD track and SD TX-9 only on the SD track; their SRC
+pages show the knobs in order with the MK1 defaults; ATK turns 0..127 as a
+slider; both PTCs read 0..127 on a plain dial; the stock machines keep their
+centred TUN and TRA picture, also after switching a track between a TX
+machine and a stock one; a kit saved with both reloads with both.
+
+**Unit** (Analog Rytm MKII, 23 Oct 2026, TX7E = stock 1.74 + core-ar2 0.5 +
+this mod at 970868e + analoghealth, 20 recorded takes, sequencer trigs at
+the pattern's default velocity), next to hugz202's Machinedrum (MD) and MK1
+port recordings:
+
+| | MKII | MD | MK1 port |
+|---|---|---|---|
+| BD TX-9 sweep at defaults | 168 > 117 > 80 > 63 > 57 > 56 Hz | 171 > 121 > 85 > 65 > 58 > 56 Hz | settles at 57 Hz |
+| BD TX-9 DEC 0 / 64 / 127, to -30 dB | 80 / 145 / 360 ms | 80 / 165 / 365 ms | 90 / 185 / 410 ms |
+| SD TX-9 body at defaults | 287 > 232 > 208 > 187 Hz | | 232 > 208 > 188 Hz |
+| SD TX-9 noise re body, SNP 64 / 127 | -19.4 / -12.8 dB | -20.4 / -15.7 dB | -18.9 / -13.9 dB |
+| SD TX-9 noise envelope to -30 dB | -9 / -19 / -31 dB at 100 / 150 / 200 ms | -10 / -19 / -31 dB | -9 / -19 / -28 dB |
+
+Every knob responds: BD PTC 0 settles at 28 Hz, DPT 0 is flat and 127 sweeps
+411 > 61 Hz, ATK 0 / 64 / 127 give the click at -53.8 / -51.9 / -47.8 dBFS
+(above 700 Hz, first 10 ms); SD PTC 0 / 127 settle at 125 / 250 Hz, DEC 0 /
+127 give a body of 65 / 405 ms to -40 dB, BND 127 bends 458 > 194 Hz in 14 ms,
+TON 0 / 127 shorten and lengthen the noise. The noise does not follow the
+body's envelope (identical at DEC 0, 64, 127), as on the MK1. CPU with both
+machines playing: 76 % (68 % with the same kit idle), DSP 71 %, peak 83 %.
+
+Below -30 dB the reference recordings reach their noise floor, so the noise
+tails can only be compared to there. Left as they are: the BD click and the
+SD noise sit a few dB above the MD's, about where the MK1 port sits, whose
+click was kept hot on purpose (design.md, v8).
 
 Not checked:
 
-- Anything audible on the MKII: pitch and decay ranges, the click and noise
-  levels against the analog body.
-- Whether anything reads record 349's old maximum (55) after boot, for
-  example the MIDI CC scaling of ATK.
-- CPU time. SD TX-9's noise runs a third-order filter over 32 samples a block
-  while it sounds; stock already takes most of the audio period.
+- The MIDI CC scaling of ATK (record 349's stock maximum was 55).
+- A full kit of TX machines alongside rytm2_mods' mods, for CPU.
