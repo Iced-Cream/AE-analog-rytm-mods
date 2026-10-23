@@ -25,9 +25,11 @@ addresses, and the tables are the MK1 mod's, unchanged:
   own parameter records, so sounds store them, MIDI reaches them on the usual
   CC 16..23, and a kit naming a TX machine loads on a build without this mod
   with that track set to DISABLE.
-- **ATK's control.** BD TX-9's ATK is record 349, which the OS builds as a
-  stepped picture (BD CLASSIC 2's Transient). Once after boot the mod gives it
-  record 344's plain slider, the same fix the MK1 mod made in v7.
+- **Knob controls.** The OS builds each record's control at boot from its id.
+  BD TX-9's ATK is record 349, a stepped picture (BD CLASSIC 2's Transient),
+  and both PTC knobs (342, 356, the hidden machines' Tune) print centred,
+  -64..63. Once after boot the mod gives ATK record 344's plain slider and
+  both PTCs a plain knob's value text, the fixes the MK1 mod made in v5 and v7.
 - **Checked in the OS 1.74 code:** BD CLASSIC and SD CLASSIC rewrite their
   voice's whole digital stream every block, so the click and the noise added
   after them never pile up; both mark a new note the way the MK1's did; the
@@ -50,9 +52,13 @@ They agree within the recordings' accuracy, so nothing is retuned.
 
 ## Status
 
-Not built against the stock file or run yet: this version assembles. Next:
-the emulator (both machines listed only on their tracks, every knob turns,
-ATK a 0..127 slider, a kit with them reloads), then a unit test.
+Emulator (rytm-emu, OS 1.74, 23 Oct 2026, build TX74 and TX74H = TX74 plus
+analoghealth): BD TX-9 is listed only on the BD track and SD TX-9 only on the
+SD track; their SRC pages show the knobs in order with the MK1 defaults; ATK
+turns 0..127 as a slider; notes on both play without a fault; a kit saved
+with both reloads with both. PTC printed centred in that build, which the
+next commit fixes (not yet re-checked). The emulator gave no audio, so
+nothing audible is checked yet. Next: a unit test with recordings.
 
 Not checked:
 

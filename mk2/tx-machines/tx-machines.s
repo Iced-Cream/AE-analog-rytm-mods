@@ -45,8 +45,10 @@
         | stepped picture) at boot from the record's id, not from its range. All
         | of SD TX-9's (ids 350..357) and BD TX-9's 342..348 are plain sliders,
         | or WAV's list, but BD TX-9's ATK is id 349, BD CLASSIC 2's stepped
-        | Transient picture. tx_machines_tick makes it a plain slider once, from
-        | HLD's (id 344) control, the way duck and fx-sends fix their knobs.
+        | Transient picture, and both PTC knobs (ids 342 and 356, the hidden
+        | machines' Tune) print their value centred, -64..63. tx_machines_tick
+        | fixes them once, from a plain knob of the same machine, the way duck
+        | and fx-sends fix their knobs and as MK1 v5 / v7 did for the same ids.
 
         .equ    STOCK_BD_CLASSIC, 0x401105c8
         .equ    STOCK_SD_CLASSIC, 0x401179bc
@@ -582,27 +584,39 @@ tx9_noise:
         move.l  (%sp)+,%a6
         rts
 
-        | ev_tick, until done once: ATK (id 349) takes HLD's (id 344) control,
-        | a plain 0..127 slider: its descriptor (+0x04, 16 B), its draw (+0x24,
-        | 16 B) and its last prototype (+0x44, 16 B), as MK1 v7 did for the same
-        | id. The records are built at boot, before the first tick.
+        | ev_tick, until done once (the records are built at boot, before the
+        | first tick): each knob below takes a plain knob's parts from a donor
+        | of its machine, 16 B each from its OS record (0x419a4888 + 0x54 id):
+        |   +0x04 the descriptor, +0x24 the draw, +0x44 the last prototype:
+        |         ATK (349) from HLD (344): a 0..127 slider, not TRA's picture
+        |   +0x14 the value text:
+        |         BD TX-9 PTC (342) from HLD (344), SD TX-9 PTC (356) from DEC
+        |         (351): 0..127, not centred
         .equ    PARAM_INFO,     0x419a4888        | RAM records, 0x54 bytes an id
         .equ    PI_STRIDE,      0x54
-        .equ    ID_ATK,         349
-        .equ    ID_DONOR,       344
+
+        .macro  PI_COPY dst, src, offs:vararg
+        lea     PARAM_INFO+\src*PI_STRIDE,%a0
+        lea     PARAM_INFO+\dst*PI_STRIDE,%a1
+        .irp    off, \offs
+        move.l  \off(%a0),\off(%a1)
+        move.l  \off+4(%a0),\off+4(%a1)
+        move.l  \off+8(%a0),\off+8(%a1)
+        move.l  \off+12(%a0),\off+12(%a1)
+        .endr
+        .endm
+
         .globl  tx_machines_tick
         .align  2
 tx_machines_tick:
         lea     tx_ready,%a0
         tst.b   (%a0)
-        bne.s   9f
+        bne.w   9f
         moveq   #1,%d0
         move.b  %d0,(%a0)
-        lea     PARAM_INFO+ID_DONOR*PI_STRIDE,%a0
-        lea     PARAM_INFO+ID_ATK*PI_STRIDE,%a1
-        .irp    off, 0x04, 0x08, 0x0c, 0x10, 0x24, 0x28, 0x2c, 0x30, 0x44, 0x48, 0x4c, 0x50
-        move.l  \off(%a0),\off(%a1)
-        .endr
+        PI_COPY 349, 344, 0x04, 0x24, 0x44
+        PI_COPY 342, 344, 0x14
+        PI_COPY 356, 351, 0x14
 9:      rts
 
         .include "tables.inc"
