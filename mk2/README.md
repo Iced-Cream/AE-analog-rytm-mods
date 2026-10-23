@@ -16,7 +16,7 @@ page-key lists.
 | [cpu-probe](cpu-probe/README.md) | 0011 | CPU, AUDIO and PEAK readouts on the CHANNELS page | hardware |
 | [duck](duck/README.md) | 0012 | DUCK page behind COMP: VCA ducking keyed by a track | hardware |
 | [fx-sends](fx-sends/README.md) | 0010 | FX SENDS page behind AMP: a chorus send | hardware |
-| TX machines | 0009 | not ported yet | |
+| [tx-machines](tx-machines/README.md) | 0009 | BD TX-9 and SD TX-9 (core-ar2 0.5); the other five not yet | in progress |
 
 "Hardware" means checked in rytm-emu and then on an Analog Rytm MKII (OS 1.74,
 core-ar2 0.4, 21 Oct 2026). Each README says what was checked and what was not.

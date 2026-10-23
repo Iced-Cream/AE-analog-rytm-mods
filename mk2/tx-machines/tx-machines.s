@@ -30,10 +30,23 @@
         | CLASSIC and SD CLASSIC were recorded on a unit at the MK1 recordings'
         | settings and match them (README), so the MK1 tuning carries over.
         |
-        | The MAC: the MK1 code is written for the fractional mode (MACSR 0x20)
-        | the MK1's interrupt runs its machines in. Each engine here sets 0x20
-        | itself, hands the stock machine the MACSR it was called with, and puts
-        | that back on return.
+        | The MAC: the code is written for the fractional mode (MACSR 0x20). The
+        | MKII's audio interrupt sets 0x20 before it calls any engine (0x4011fbfe),
+        | as the MK1's does; each engine here still sets it itself, hands the
+        | stock machine the MACSR it was called with, and puts that back on return.
+        |
+        | Checked in the OS 1.74 code: BD CLASSIC and SD CLASSIC write all 32
+        | longs of their voice's stream 1 on every call (a ramp loop before their
+        | one exit, 0x40110c20 / 0x40117f3e), so the click and the noise added
+        | after them never pile up; both test the voice's state word at
+        | 0x8000fef8 + 0x20 v for 0 on the call after a trig, as note_on does.
+        |
+        | The knobs' controls: the OS builds each record's control (slider, list,
+        | stepped picture) at boot from the record's id, not from its range. All
+        | of SD TX-9's (ids 350..357) and BD TX-9's 342..348 are plain sliders,
+        | or WAV's list, but BD TX-9's ATK is id 349, BD CLASSIC 2's stepped
+        | Transient picture. tx_machines_tick makes it a plain slider once, from
+        | HLD's (id 344) control, the way duck and fx-sends fix their knobs.
 
         .equ    STOCK_BD_CLASSIC, 0x401105c8
         .equ    STOCK_SD_CLASSIC, 0x401179bc
@@ -569,6 +582,29 @@ tx9_noise:
         move.l  (%sp)+,%a6
         rts
 
+        | ev_tick, until done once: ATK (id 349) takes HLD's (id 344) control,
+        | a plain 0..127 slider: its descriptor (+0x04, 16 B), its draw (+0x24,
+        | 16 B) and its last prototype (+0x44, 16 B), as MK1 v7 did for the same
+        | id. The records are built at boot, before the first tick.
+        .equ    PARAM_INFO,     0x419a4888        | RAM records, 0x54 bytes an id
+        .equ    PI_STRIDE,      0x54
+        .equ    ID_ATK,         349
+        .equ    ID_DONOR,       344
+        .globl  tx_machines_tick
+        .align  2
+tx_machines_tick:
+        lea     tx_ready,%a0
+        tst.b   (%a0)
+        bne.s   9f
+        moveq   #1,%d0
+        move.b  %d0,(%a0)
+        lea     PARAM_INFO+ID_DONOR*PI_STRIDE,%a0
+        lea     PARAM_INFO+ID_ATK*PI_STRIDE,%a1
+        .irp    off, 0x04, 0x08, 0x0c, 0x10, 0x24, 0x28, 0x2c, 0x30, 0x44, 0x48, 0x4c, 0x50
+        move.l  \off(%a0),\off(%a1)
+        .endr
+9:      rts
+
         .include "tables.inc"
 
         | ==================================================== the machine table
@@ -648,5 +684,6 @@ n9_state:       .long   0, 0, 0, 0, 0, 0, 0, 0, 0, 0x35a7c100, 0, 0   | E C cnt 
 
         .bss
         .align  4
+tx_ready:       .space  4
 t9bd_state:     .space  8 * 8
 t9sd_state:     .space  8 * 8
