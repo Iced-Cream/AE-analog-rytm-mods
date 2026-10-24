@@ -11,8 +11,8 @@ Version 0.1 had the two TX-9 machines (emulator and unit tested, below);
 | 36 | BD TX-9 | BD | LEV PTC DEC TUN DPT ACC WAV ATK | BD CLASSIC, plus the TX-9's click |
 | 37 | SD TX-9 | SD | LEV PTC DEC TON SNP ACC BND DTU | SD CLASSIC, plus the TX-9's own noise |
 | 38 | SD TX-8 | SD | LEV PTC DEC TON SNP ACC DET TRA | SD CLASSIC, plus the TX-8's noise (0.2, untested) |
-| 39 | XT TX-9 | MT, HT | LEV PTC DEC TYP ACC BND NOI TON | XT CLASSIC; TYP picks LT, MT or HT tuning (0.2, untested) |
-| 40 | XT TX-8 | MT, HT | LEV PTC DEC TYP TUN ACC DIO NOI | XT CLASSIC (0.2, untested) |
+| 39 | XT TX-9 | LT, MT, HT | LEV PTC DEC TYP ACC BND NOI TON | XT CLASSIC; TYP picks LT, MT or HT tuning (0.2, untested) |
+| 40 | XT TX-8 | LT, MT, HT | LEV PTC DEC TYP TUN ACC DIO NOI | XT CLASSIC (0.2, untested) |
 | 41 | BD TX-9 DIGI | BD | LEV PTC DEC TUN DPT ACC WAV ATK | BD TX-9 with the digital wave (0.2, untested) |
 | 42 | BT TX-8 | BT | LEV PTC DEC SIG ACC HLD NOI ATK | its own tone and noise on the BT voice (0.2, untested) |
 
@@ -58,11 +58,18 @@ They agree within the recordings' accuracy, so nothing is retuned.
 
 ## Status
 
-**0.2 (the five new machines):** assembled only. Points to check first: TYP
-(records 366 and 374) shows LT/MT/HT through `core_params` and keeps its 0..2
-range after the boot copy of a plain knob's control; each machine lists only
-on its track; BT TX-8 does not use the digital stream (BT CLASSIC clears it
-every block on OS 1.74); CPU with BD TX-9 DIGI.
+**0.2 (the five new machines), emulator** (rytm-emu, OS 1.74, 24 Oct 2026,
+build TX8A = stock 1.74 + core-ar2 0.5 + this mod at 994b045): each machine is
+listed only on its tracks (the toms on LT, MT and HT, as on the MK1); the SRC
+pages show the knobs in order with the MK1 defaults; every PTC and every
+copied control reads plain 0..127; SD TX-8's DET is SD CLASSIC's 0..32 and
+BD TX-9 DIGI's WAV a 0..2 list, as on the MK1; a kit with all of them saves
+and reloads, and the stock machines keep their own TUN picture. BD TX-9 DIGI,
+SD TX-8 and both toms write their voice's stream under the sequencer with no
+fault; the emulator ran no BT voice at all (stock BT CLASSIC neither), so BT
+TX-8 is unchecked there. TX8A printed TYP 1 as HT and 2 as blank (a doubled
+index, fixed after 994b045). TYP takes 0..127 from the encoder and MIDI, as
+on the MK1: above 2 it shows and plays HT.
 
 **0.1 (BD TX-9, SD TX-9):**
 

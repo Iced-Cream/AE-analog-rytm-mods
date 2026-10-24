@@ -1316,7 +1316,8 @@ tx_machines_tick:
 9:      rts
 
         | int tx_typ_text(struct core_text *t): core-ar2's core_params text
-        | callback for the two TYP knobs: LT, MT or HT for 0, 1, 2 (above 2: HT).
+        | callback for the two TYP knobs: LT, MT or HT for 0, 1, 2 (above 2: HT,
+        | as on the MK1, whose TYP also takes 0..127 and plays HT above 2).
         | t: +8 the value (8.8), +12 the buffer. Returns 1 (CORE_TEXT_DONE).
         .globl  tx_typ_text
         .align  2
@@ -1332,8 +1333,7 @@ tx_typ_text:
         move.l  %d1,%d0
 2:      move.l  12(%a0),%a1
         lea     typ_names,%a0
-        add.l   %d0,%d0
-        add.l   %d0,%a0
+        add.l   %d0,%a0                           | one letter per name
         move.b  #'T',1(%a1)
         move.b  (%a0),(%a1)
         clr.b   2(%a1)
