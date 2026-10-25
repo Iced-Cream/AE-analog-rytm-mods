@@ -121,7 +121,11 @@ TYPE 1/2 at high PTC (140-190 Hz) sit at -4..-1 dB. t30 and pitch are
 unchanged. So the partial's level now also follows the main's pitch
 (x9_sg, from a fit to those 9 takes, 0.5 dB rms): +1.6 dB at 65 Hz and below,
 -0.5 dB at 100 Hz, -5 dB at 178 Hz and above, aiming at the MD's -7 dB at
-68 Hz and -6 dB from 99 Hz up. Emulator and unit checks pending.
+68 Hz and -6 dB from 99 Hz up. On the unit (25 Oct 2026, TX8FH, 9 takes)
+the partial then reads -7 dB at TYPE 0 (65 / 96 / 128 Hz) and -6 dB at
+TYPE 1 and 2 (79..188 Hz), within 1 dB of the MD everywhere; t30 is within
+12 % of before (325 / 240 / 265 ms at PTC 64, MD 350 / 255 / 240) and the
+main's pitch is unchanged.
 
 **Known limits, as on the MK1 port:** XT TX-8's longest decays reach about
 1.1 s against the MD's ~3 s, because the stock XT CLASSIC damps hard past
