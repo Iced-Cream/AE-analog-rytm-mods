@@ -2,9 +2,9 @@
 
 Port of [0009-tx-machines](../../mods/0009-tx-machines/design.md) (Analog Rytm
 MK1) to the Analog Rytm MKII, OS 1.74, as an elekloader elemod on core-ar2 0.5.
-Version 0.1 had the two TX-9 machines (emulator and unit tested, below);
-0.2 adds the other five of the MK1 mod, which so far are only assembled
-(emulator and unit tests pending).
+Version 0.1 had the two TX-9 machines; 0.2 adds the other five of the MK1
+mod. All seven are emulator and unit tested (below); BT TX-8's decay is still
+to be refitted to the MKII's BT CLASSIC.
 
 | slot | machine | track | knobs | runs |
 |---|---|---|---|---|
@@ -70,6 +70,27 @@ fault; the emulator ran no BT voice at all (stock BT CLASSIC neither), so BT
 TX-8 is unchecked there. TX8A printed TYP 1 as HT and 2 as blank (a doubled
 index, fixed after 994b045). TYP takes 0..127 from the encoder and MIDI, as
 on the MK1: above 2 it shows and plays HT.
+
+**0.2, unit** (Analog Rytm MKII, 24 Oct 2026, TX8BH = TX8B + analoghealth,
+46 recorded takes, sequencer trigs; decays compared to -30 dB):
+
+| | MKII | MD | MK1 port |
+|---|---|---|---|
+| XT TX-8 settled, TYP 0 / 1 / 2 | 90 / 140 / 191 Hz | 91 / 141 / 192 Hz | (earlier, low-tuned version) |
+| XT TX-8 t30, TYP 0 / 1 / 2 | 315 / 220 / 160 ms | 340 / 210 / 160 ms | |
+| XT TX-9 t30, TYP 0 / 1 / 2 | 385 / 265 / 250 ms | 350 / 255 / 240 ms | 350 / 230 / 215 ms |
+| BD TX-9 DIGI sweep | 177 > 123 > 84 > 64 > 58 > 56 Hz | 171 > 121 > 85 > 65 > 58 > 56 Hz | |
+| BD TX-9 DIGI t30, DEC 0 / 64 / 127 | 90 / 180 / 415 ms | 80 / 165 / 365 ms | |
+| SD TX-8 body | 254 Hz | 251 Hz | |
+| BT TX-8 pitch, PTC 0 / 64 / 127 | 25 / 50 / ~100 Hz | 24.7 / 49.4 / 96-98 Hz | |
+| BT TX-8 t30, DEC 0 / 64 / 127 | 45 / 365 / 1535 ms | 60 / 410 / 1200 ms | |
+
+BD TX-9 DIGI and SD TX-8's noise are computed digitally, so they sound as the
+MK1 port does (DIGI's decay 10-14 % long, the SD TX-8 noise a few dB above
+the MD's) and are left as they are. BT TX-8 runs the stock BT CLASSIC, which
+on the MKII rings 1.3-1.7x longer than the MK1's that its tables were fitted
+to (same pitch); a refit from MKII recordings is planned. CPU with all five
+new machines playing: 80.5-83.1 %, DSP peak 89.2 % at the hit.
 
 **0.1 (BD TX-9, SD TX-9):**
 
