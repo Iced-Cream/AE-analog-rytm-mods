@@ -3,8 +3,8 @@
 Port of [0009-tx-machines](../../mods/0009-tx-machines/design.md) (Analog Rytm
 MK1) to the Analog Rytm MKII, OS 1.74, as an elekloader elemod on core-ar2 0.5.
 Version 0.1 had the two TX-9 machines; 0.2 adds the other five of the MK1
-mod. All seven are emulator and unit tested (below); BT TX-8's decay, refitted
-to the MKII's BT CLASSIC, awaits its recheck on the unit.
+mod. All seven are emulator and unit tested (below), BT TX-8 with its decay
+refitted to the MKII's BT CLASSIC.
 
 | slot | machine | track | knobs | runs |
 |---|---|---|---|---|
@@ -95,8 +95,18 @@ against the MK1's 60..650 ms) and scaled by what BT TX-8 measured on the
 unit, at PTC 64 and at both ends of PTC. The first refit (a655eb4) put DEC
 on the MD on the unit (t30 60 / 430 / 1250 ms at DEC 0 / 64 / 127, MD 60 /
 410 / 1200) but PTC 0 rang 1395 ms (MD 665, the TX-8 table 823): BT CLASSIC's
-decay is flat below ~38 Hz, which the model missed. The second refit corrects
-the pitch term at both ends; its recheck on the unit is pending. CPU with all five
+decay is flat below ~38 Hz, which the model missed. The second refit
+(bdbdc37) corrects the pitch term at both ends. On the unit (25 Oct 2026,
+TX8DH) BT TX-8 then rings within -7..+9 % of the TX-8's table everywhere:
+
+| BT TX-8 t30 | MKII | TX-8 table | MD |
+|---|---|---|---|
+| PTC 0 / 64 / 127, DEC 64 | 895 / 405 / 210 ms | 823 / 414 / 225 ms | 872 / 439 / 239 ms (slope fits) |
+| DEC 0 / 127, PTC 64 | 60 / 1185 ms | 55 / 1197 ms | 60 / 1200 ms |
+
+(The 665 ms at PTC 0 read straight off the MD take is that quiet hit's
+-30 dB point running into the recording floor; the table follows the slope
+fits.) CPU with BT TX-8 playing: about 72 %, DSP peak 73.3 %. CPU with all five
 new machines playing: 80.5-83.1 %, DSP peak 89.2 % at the hit.
 
 **0.1 (BD TX-9, SD TX-9):**
