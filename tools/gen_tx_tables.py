@@ -104,6 +104,22 @@ TX9SD_NOISE_TRIM_DB = -1.7
 BT_F64 = 60.8
 BT_T30_77 = {0: 60, 32: 252, 64: 412, 96: 548, 127: 650}
 BT_T30_F = [(24.8, 1863.0), (60.7, 726.0), (131.3, 64.0)]
+# The MKII's BT CLASSIC (OS 1.74, recorded 2026-10-25, SNP 0 NOL 0 SWD 0; t30 from the 5 ms
+# peak envelope): 60.67 Hz at TUN 64, a quarter semitone per step, as on the MK1, but it
+# rings 1.3-1.5x longer. t30 vs DEC at TUN 80 (75.3 Hz) and vs pitch at DEC 63 (TUN 0..127).
+BT_MK2_F64 = 60.67
+BT_MK2_FDEC = 75.3
+BT_MK2_T30_DEC = {0: 25, 16: 160, 32: 285, 48: 410, 64: 535, 80: 655, 96: 760, 112: 880, 127: 965}
+BT_MK2_T30_F = [(24.5, 1890.0), (25.1, 1960.0), (30.4, 1905.0), (37.8, 2100.0), (47.5, 1405.0),
+                (59.5, 1200.0), (75.3, 515.0), (95.7, 230.0), (132.2, 85.0), (153.6, 55.0)]
+# BT TX-8 on the MK1-fitted tables (unit, 2026-10-24) rang 45 / 365 / 1535 ms at BT DEC 0 /
+# 16 / 75 (49.7 Hz), 0.68 / 0.86 / 0.94 of the separable model: short decays fall off
+# faster than it says. The model is scaled by that, linear between, constant beyond.
+BT_MK2_CORR = {0: 0.681, 16: 0.863, 75: 0.941}
+# Nor is pitch separable at the ends: on the unit (2026-10-25) BT TX-8 at PTC 0 (24.85 Hz)
+# rang 1.7-2.0x the model (975 / 1395 ms at BT DEC 15 / 27), at PTC 127 (99.4 Hz) 0.80-0.85x
+# (205 / 190 ms at BT DEC 85 / 73). G is scaled by this, log-linear in log f, 1 at 49.7 Hz.
+BT_MK2_GCORR = [(24.85, 2.0), (49.7, 1.0), (99.4, 0.82)]
 TX8_F64 = 49.7                       # the TX-8 BD at PTCH 64 (WAVS3: 49.4 .. 49.8 Hz)
 TX9_F64 = 56.0                       # the TX-9 BD at PTCH 64 (WAVS2/3 tails: 56.0 Hz)
 # BD TX-9 DIGI's decay: the emulator table, x the real MD's ratio to it (WAVS3: t30 80 /
@@ -139,6 +155,16 @@ X9_HOLD_FRAC, X9_TAIL_FRAC, X9_T30_TYPE12 = 0.12, 0.9, 0.68
 # Second partial at 2/3 f (TYPE 0 DEC 127, 120 ms windows: 61 Hz at -6.5 / -5.2 / -4.7 /
 # -4.3 dB re the 91.5 Hz main at 70 / 130 / 190 / 250 ms; 0.062 dB/ms, the main 0.072).
 X9S_A0, X9S_T30 = 0.16, 1.1          # start level (MD full scale, ACC 96), t-30 / main's
+# On the MKII (unit, 2026-10-25) the partial measured 0..-5 dB under the main (40-200 ms
+# spectra), the MD -6 dB on all eight hits, the design ~-5 dB: X9S_K is trimmed by this there.
+X9S_MK2_TRIM_DB = -3.5
+# With that trim (unit, TX8EH, 2026-10-25, 9 takes, TYPE 0/1/2 x PTC 0/64/127) the partial still
+# rose with the main's pitch: re the main, dB = X9S_MK2_FIT_A + X9S_MK2_FIT_B log2(f), 0.5 dB rms
+# over 65..188 Hz. The MD reads -7 dB at 68 Hz and -6 dB at 99..145 Hz (X9S_MD_DB), so x9_sg
+# scales the partial by MD - fit, held at the ends of the measured range.
+X9S_MK2_FIT_A, X9S_MK2_FIT_B = -38.25, 4.93
+X9S_MK2_FIT_F = (65.0, 188.0)
+X9S_MD_DB = {68: -7.0, 99: -6.0, 145: -6.0}
 # TX-8 BD ATK starts the kick on a segment at ~2.2x the pitch (half-periods 2.0 ms at
 # PTCH 127, body 4.7 ms), ~0.067 ms per ATK step long, then the body (emulator).
 TX8BD_ATK_RATIO, TX8BD_ATK_MS_PER_STEP = 2.2, 0.067
@@ -445,6 +471,17 @@ def toms() -> list[str]:
     return out
 
 
+def x9_sg() -> list[str]:
+    """MKII only: the partial's gain for the main's TUN (TUN >> 10, interpolated), Q14."""
+    lo, hi = X9S_MK2_FIT_F
+    vals = []
+    for i in range(33):
+        f = min(hi, max(lo, RYTM_XT_F0 * 2 ** ((1024 * i - 0x4000) / 6144)))
+        md = at(X9S_MD_DB, min(max(f, 68), 145))
+        vals.append(16384 * 10 ** ((md - (X9S_MK2_FIT_A + X9S_MK2_FIT_B * math.log2(f))) / 20))
+    return words("x9_sg", vals, "TX-9 tom partial (MKII): gain for TUN >> 10, Q14 (--mk2-x9s)")
+
+
 def x9_sub() -> list[str]:
     """The TX-9 tom's second partial: a sine at exactly 2/3 of the main pitch (all
     TYPEs and PTCHs, emulator, 120 ms windows), ~5 dB under it, decaying ~1.1x as
@@ -461,24 +498,46 @@ def x9_sub() -> list[str]:
     return out
 
 
-def bt_g(f: float) -> float:
-    """BT CLASSIC t30 vs pitch at DEC 63 (log-log through BT_T30_F, end slopes beyond)."""
-    pts = BT_T30_F
-    i = 0 if f < pts[1][0] else 1
+def bt_g(f: float, pts=None) -> float:
+    """BT CLASSIC t30 vs pitch at DEC 63 (log-log between the points, end slopes beyond)."""
+    pts = pts or BT_T30_F
+    i = 0
+    while i < len(pts) - 2 and f >= pts[i + 1][0]:
+        i += 1
     (f0, t0), (f1, t1) = pts[i], pts[i + 1]
     return t0 * math.exp(math.log(t1 / t0) * math.log(f / f0) / math.log(f1 / f0))
 
 
-def bt8() -> list[str]:
+def bt_gcorr(f: float) -> float:
+    """BT_MK2_GCORR at f: log-linear in log f between its points, held beyond."""
+    c = BT_MK2_GCORR
+    if f <= c[0][0]:
+        return c[0][1]
+    if f >= c[-1][0]:
+        return c[-1][1]
+    i = 0 if f < c[1][0] else 1
+    (f0, c0), (f1, c1) = c[i], c[i + 1]
+    return c0 * math.exp(math.log(c1 / c0) * math.log(f / f0) / math.log(f1 / f0))
+
+
+def bt8(mk2: bool = False) -> list[str]:
     """BT TX-8: the TX-8 BD on the BT voice's resonator (BT CLASSIC run every block).
     PTC -> TUN (49.7 Hz at PTC 64, two octaves over PTC; TUN = a quarter semitone);
     DEC -> BT DEC so that t30 matches the TX-8's, at PTC 64, plus an offset for PTC
-    (exact at DEC 64), through the separable BT model above."""
+    (exact at DEC 64), through the separable BT model above. mk2: the same from the
+    MKII's BT CLASSIC (mk2/tx-machines)."""
     P = pts33()
-    g77 = bt_g(77.0)
+    if mk2:
+        t_dec, f_dec, pts, f64 = BT_MK2_T30_DEC, BT_MK2_FDEC, BT_MK2_T30_F, BT_MK2_F64
+        t_dec = {q: at(t_dec, q) * at(BT_MK2_CORR, q) for q in range(128)}
+    else:
+        t_dec, f_dec, pts, f64 = BT_T30_77, 77.0, BT_T30_F, BT_F64
+    g_ref = bt_g(f_dec, pts)
+    if mk2:
+        pts = [(f, t * bt_gcorr(f)) for f, t in pts]
     def bt_dec(t30, f):
-        want = t30 * g77 / bt_g(f)
-        return min(range(128), key=lambda q: abs(math.log(at(BT_T30_77, q) / want)))
+        want = t30 * g_ref / bt_g(f, pts)
+        return min(range(128), key=lambda q: abs(math.log(at(t_dec, q) / want)))
     def tmd(dm, p):
         return at(TX8BD_T30, dm) * at(TX8BD_T30_PTCH, p) / at(TX8BD_T30_PTCH, 64)
     def f_of(p):
@@ -486,9 +545,9 @@ def bt8() -> list[str]:
     dec = [bt_dec(tmd(p, 64), f_of(64)) for p in P]
     d64 = bt_dec(tmd(64, 64), f_of(64))
     dq = [bt_dec(tmd(64, p), f_of(p)) - d64 for p in P]
-    tunoff = (64 + 48 * math.log2(TX8_F64 / BT_F64)) * 256
+    tunoff = (64 + 48 * math.log2(TX8_F64 / f64)) * 256
     out = [f"| BT TX-8: at PTC 64 the BT DEC spans {dec[0]}..{dec[-1]} for DEC 0..127 "
-           f"(t30 {at(BT_T30_77, dec[0]) * bt_g(f_of(64)) / g77:.0f}..{at(BT_T30_77, dec[-1]) * bt_g(f_of(64)) / g77:.0f} ms, "
+           f"(t30 {at(t_dec, dec[0]) * bt_g(f_of(64), pts) / g_ref:.0f}..{at(t_dec, dec[-1]) * bt_g(f_of(64), pts) / g_ref:.0f} ms, "
            f"the TX-8 {tmd(0, 64):.0f}..{tmd(127, 64):.0f})"]
     out += [f"        .equ    BT8_TUNOFF, {round(tunoff)}   | BT CLASSIC TUN word at PTC 64 = {TX8_F64} Hz"]
     out += words("b8_dec", dec, "BT TX-8: BT CLASSIC DEC for DEC (t30 at PTC 64)")
@@ -668,6 +727,14 @@ def render() -> str:
 
 
 def main():
+    if "--mk2-x9s" in sys.argv:
+        k = X9S_A0 * 65536 * max(X9_PEAK.values()) / at(X9_PEAK, 96) * 10 ** (X9S_MK2_TRIM_DB / 20)
+        print(f"        .equ    X9S_K, {round(k)}   | {X9S_MK2_TRIM_DB} dB on the MKII (--mk2-x9s)")
+        print("\n".join(x9_sg()))
+        return
+    if "--mk2-bt8" in sys.argv:
+        print("\n".join(bt8(mk2=True)))
+        return
     text = render()
     if "--check" in sys.argv:
         if not OUT.exists() or OUT.read_text() != text:
