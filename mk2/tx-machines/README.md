@@ -3,8 +3,8 @@
 Port of [0009-tx-machines](../../mods/0009-tx-machines/design.md) (Analog Rytm
 MK1) to the Analog Rytm MKII, OS 1.74, as an elekloader elemod on core-ar2 0.5.
 Version 0.1 had the two TX-9 machines; 0.2 adds the other five of the MK1
-mod. All seven are emulator and unit tested (below); BT TX-8's decay is still
-to be refitted to the MKII's BT CLASSIC.
+mod. All seven are emulator and unit tested (below); BT TX-8's decay, refitted
+to the MKII's BT CLASSIC, awaits its recheck on the unit.
 
 | slot | machine | track | knobs | runs |
 |---|---|---|---|---|
@@ -89,7 +89,10 @@ BD TX-9 DIGI and SD TX-8's noise are computed digitally, so they sound as the
 MK1 port does (DIGI's decay 10-14 % long, the SD TX-8 noise a few dB above
 the MD's) and are left as they are. BT TX-8 runs the stock BT CLASSIC, which
 on the MKII rings 1.3-1.7x longer than the MK1's that its tables were fitted
-to (same pitch); a refit from MKII recordings is planned. CPU with all five
+to (same pitch). So BT TX-8's decay tables are refitted from the MKII's BT
+CLASSIC (19 takes, 25 Oct 2026: t30 25..965 ms over DEC 0..127 at 75 Hz,
+against the MK1's 60..650 ms) and scaled by what BT TX-8 measured on the
+unit; the recheck on the unit is pending. CPU with all five
 new machines playing: 80.5-83.1 %, DSP peak 89.2 % at the hit.
 
 **0.1 (BD TX-9, SD TX-9):**

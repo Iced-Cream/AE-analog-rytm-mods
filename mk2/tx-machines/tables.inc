@@ -4,6 +4,9 @@
         | TX samples. 33-entry tables: p >> 2, linear over p & 3. The MKII's BD
         | CLASSIC and SD CLASSIC were recorded on a unit at the MK1 recordings'
         | settings and match them (README), so the MK1 tuning carries over.
+        | BT TX-8's BT8_TUNOFF, b8_dec and b8_dq are the exception: the MKII's
+        | BT CLASSIC rings longer, so they come from MKII recordings
+        | (tools/gen_tx_tables.py --mk2-bt8).
 
         .text
 
@@ -343,20 +346,20 @@ x8_nol:                       | TX-8 tom: XT CLASSIC NOL for NOI
         .equ    X8_DDEC, 0x7de26481   | droop decay per block
         .equ    X8_NOD, 768
 
-| BT TX-8: at PTC 64 the BT DEC spans 0..75 for DEC 0..127 (t30 157..1197 ms, the TX-8 55..1197)
-        .equ    BT8_TUNOFF, 12810   | BT CLASSIC TUN word at PTC 64 = 49.7 Hz
+| BT TX-8: at PTC 64 the BT DEC spans 1..59 for DEC 0..127 (t30 61..1206 ms, the TX-8 55..1197)
+        .equ    BT8_TUNOFF, 12848   | BT CLASSIC TUN word at PTC 64 = 49.7 Hz
 
         .align  2
 b8_dec:                       | BT TX-8: BT CLASSIC DEC for DEC (t30 at PTC 64)
-        .short  0, 0, 0, 0, 0, 0, 1, 2, 3, 5, 6
-        .short  7, 9, 11, 13, 15, 16, 19, 21, 23, 25, 27
-        .short  30, 33, 36, 40, 45, 49, 53, 58, 64, 70, 75
+        .short  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+        .short  12, 13, 14, 16, 17, 19, 20, 22, 24, 26, 28
+        .short  30, 32, 34, 37, 40, 43, 46, 49, 53, 56, 59
 
         .align  2
 b8_dq:                       | BT TX-8: DEC offset for PTC (exact at DEC 64)
-        .short  -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0
-        .short  0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2
-        .short  5, 9, 12, 16, 21, 27, 33, 40, 48, 58, 69
+        .short  8, 7, 6, 5, 4, 3, 1, 0, -2, -3, -3
+        .short  -3, -2, -1, -1, 0, 0, 0, -1, -1, -1, 1
+        .short  4, 7, 11, 15, 19, 24, 29, 34, 40, 47, 54
 
 
         .align  2

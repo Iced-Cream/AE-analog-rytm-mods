@@ -104,6 +104,18 @@ TX9SD_NOISE_TRIM_DB = -1.7
 BT_F64 = 60.8
 BT_T30_77 = {0: 60, 32: 252, 64: 412, 96: 548, 127: 650}
 BT_T30_F = [(24.8, 1863.0), (60.7, 726.0), (131.3, 64.0)]
+# The MKII's BT CLASSIC (OS 1.74, recorded 2026-10-25, SNP 0 NOL 0 SWD 0; t30 from the 5 ms
+# peak envelope): 60.67 Hz at TUN 64, a quarter semitone per step, as on the MK1, but it
+# rings 1.3-1.5x longer. t30 vs DEC at TUN 80 (75.3 Hz) and vs pitch at DEC 63 (TUN 0..127).
+BT_MK2_F64 = 60.67
+BT_MK2_FDEC = 75.3
+BT_MK2_T30_DEC = {0: 25, 16: 160, 32: 285, 48: 410, 64: 535, 80: 655, 96: 760, 112: 880, 127: 965}
+BT_MK2_T30_F = [(24.5, 1890.0), (25.1, 1960.0), (30.4, 1905.0), (37.8, 2100.0), (47.5, 1405.0),
+                (59.5, 1200.0), (75.3, 515.0), (95.7, 230.0), (132.2, 85.0), (153.6, 55.0)]
+# BT TX-8 on the MK1-fitted tables (unit, 2026-10-24) rang 45 / 365 / 1535 ms at BT DEC 0 /
+# 16 / 75 (49.7 Hz), 0.68 / 0.86 / 0.94 of the separable model: short decays fall off
+# faster than it says. The model is scaled by that, linear between, constant beyond.
+BT_MK2_CORR = {0: 0.681, 16: 0.863, 75: 0.941}
 TX8_F64 = 49.7                       # the TX-8 BD at PTCH 64 (WAVS3: 49.4 .. 49.8 Hz)
 TX9_F64 = 56.0                       # the TX-9 BD at PTCH 64 (WAVS2/3 tails: 56.0 Hz)
 # BD TX-9 DIGI's decay: the emulator table, x the real MD's ratio to it (WAVS3: t30 80 /
@@ -461,24 +473,32 @@ def x9_sub() -> list[str]:
     return out
 
 
-def bt_g(f: float) -> float:
-    """BT CLASSIC t30 vs pitch at DEC 63 (log-log through BT_T30_F, end slopes beyond)."""
-    pts = BT_T30_F
-    i = 0 if f < pts[1][0] else 1
+def bt_g(f: float, pts=None) -> float:
+    """BT CLASSIC t30 vs pitch at DEC 63 (log-log between the points, end slopes beyond)."""
+    pts = pts or BT_T30_F
+    i = 0
+    while i < len(pts) - 2 and f >= pts[i + 1][0]:
+        i += 1
     (f0, t0), (f1, t1) = pts[i], pts[i + 1]
     return t0 * math.exp(math.log(t1 / t0) * math.log(f / f0) / math.log(f1 / f0))
 
 
-def bt8() -> list[str]:
+def bt8(mk2: bool = False) -> list[str]:
     """BT TX-8: the TX-8 BD on the BT voice's resonator (BT CLASSIC run every block).
     PTC -> TUN (49.7 Hz at PTC 64, two octaves over PTC; TUN = a quarter semitone);
     DEC -> BT DEC so that t30 matches the TX-8's, at PTC 64, plus an offset for PTC
-    (exact at DEC 64), through the separable BT model above."""
+    (exact at DEC 64), through the separable BT model above. mk2: the same from the
+    MKII's BT CLASSIC (mk2/tx-machines)."""
     P = pts33()
-    g77 = bt_g(77.0)
+    if mk2:
+        t_dec, f_dec, pts, f64 = BT_MK2_T30_DEC, BT_MK2_FDEC, BT_MK2_T30_F, BT_MK2_F64
+        t_dec = {q: at(t_dec, q) * at(BT_MK2_CORR, q) for q in range(128)}
+    else:
+        t_dec, f_dec, pts, f64 = BT_T30_77, 77.0, BT_T30_F, BT_F64
+    g_ref = bt_g(f_dec, pts)
     def bt_dec(t30, f):
-        want = t30 * g77 / bt_g(f)
-        return min(range(128), key=lambda q: abs(math.log(at(BT_T30_77, q) / want)))
+        want = t30 * g_ref / bt_g(f, pts)
+        return min(range(128), key=lambda q: abs(math.log(at(t_dec, q) / want)))
     def tmd(dm, p):
         return at(TX8BD_T30, dm) * at(TX8BD_T30_PTCH, p) / at(TX8BD_T30_PTCH, 64)
     def f_of(p):
@@ -486,9 +506,9 @@ def bt8() -> list[str]:
     dec = [bt_dec(tmd(p, 64), f_of(64)) for p in P]
     d64 = bt_dec(tmd(64, 64), f_of(64))
     dq = [bt_dec(tmd(64, p), f_of(p)) - d64 for p in P]
-    tunoff = (64 + 48 * math.log2(TX8_F64 / BT_F64)) * 256
+    tunoff = (64 + 48 * math.log2(TX8_F64 / f64)) * 256
     out = [f"| BT TX-8: at PTC 64 the BT DEC spans {dec[0]}..{dec[-1]} for DEC 0..127 "
-           f"(t30 {at(BT_T30_77, dec[0]) * bt_g(f_of(64)) / g77:.0f}..{at(BT_T30_77, dec[-1]) * bt_g(f_of(64)) / g77:.0f} ms, "
+           f"(t30 {at(t_dec, dec[0]) * bt_g(f_of(64), pts) / g_ref:.0f}..{at(t_dec, dec[-1]) * bt_g(f_of(64), pts) / g_ref:.0f} ms, "
            f"the TX-8 {tmd(0, 64):.0f}..{tmd(127, 64):.0f})"]
     out += [f"        .equ    BT8_TUNOFF, {round(tunoff)}   | BT CLASSIC TUN word at PTC 64 = {TX8_F64} Hz"]
     out += words("b8_dec", dec, "BT TX-8: BT CLASSIC DEC for DEC (t30 at PTC 64)")
@@ -668,6 +688,9 @@ def render() -> str:
 
 
 def main():
+    if "--mk2-bt8" in sys.argv:
+        print("\n".join(bt8(mk2=True)))
+        return
     text = render()
     if "--check" in sys.argv:
         if not OUT.exists() or OUT.read_text() != text:
