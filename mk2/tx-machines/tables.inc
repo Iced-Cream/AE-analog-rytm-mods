@@ -447,6 +447,12 @@ a9_wave:                       | TX-9 BD: attack waveform, 48 kHz, 8 bit of its 
         .equ    X9S_K, 8817   | -3.5 dB on the MKII (--mk2-x9s)
 
         .align  2
+x9_sg:                       | TX-9 tom partial (MKII): gain for TUN >> 10, Q14 (--mk2-x9s)
+        .short  19607, 19607, 19607, 19607, 19607, 19607, 19607, 19607, 19607, 19607, 19607
+        .short  19607, 19607, 19607, 19607, 19607, 19607, 19607, 19607, 18486, 17367, 16380
+        .short  15460, 14065, 12795, 11640, 10590, 9634, 9220, 9220, 9220, 9220, 9220
+
+        .align  2
 x9_sinc:                       | TX-9 tom partial: phase step per sample, TUN >> 10
         .long   0x00072ae5, 0x00080b99, 0x000907d2, 0x000a22ee
         .long   0x000b60b6, 0x000cc568, 0x000e55c9, 0x00101732

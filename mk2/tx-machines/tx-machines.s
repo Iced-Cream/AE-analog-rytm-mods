@@ -1152,7 +1152,8 @@ xt_dec:
         | ==================================================== TX-9 tom partial
         | The 909 tom's second partial: a sine at 2/3 of the pitch being sent (d4,
         | the XT TUN word, bend included), decaying a little slower than the main
-        | (x9_sd for DEC; TYPE 1, 2 x1.47 faster), written into stream 1 - the
+        | (x9_sd for DEC; TYPE 1, 2 x1.47 faster), its level following the pitch
+        | (x9_sg, MKII), written into stream 1 - the
         | path the BD attacks and SD noises take. v7 added it into buffer B (XT
         | CLASSIC's noise buffer) and it was not heard on the hardware. Nothing
         | stock writes A on the tom voices, so the partial is stored, not added,
@@ -1205,6 +1206,26 @@ x9_sub:
         move.l  #X9S_K,%d1
         mulu.l  %d1,%d0
         moveq   #15,%d1
+        lsr.l   %d1,%d0
+        move.l  %d4,%d1                           | * x9_sg(TUN), Q14: on the MKII
+        moveq   #10,%d2                           | the partial rose ~5 dB/oct of
+        lsr.l   %d2,%d1                           | the main, this holds it at the
+        lea     x9_sg,%a0                         | MD's -6..-7 dB
+        add.l   %d1,%a0
+        add.l   %d1,%a0
+        moveq   #0,%d2
+        move.w  (%a0),%d2
+        moveq   #0,%d3
+        move.w  2(%a0),%d3
+        sub.l   %d2,%d3
+        move.l  %d4,%d1
+        and.l   #0x3ff,%d1
+        muls.l  %d1,%d3
+        asr.l   #8,%d3
+        asr.l   #2,%d3
+        add.l   %d3,%d2
+        mulu.l  %d2,%d0
+        moveq   #14,%d1
         lsr.l   %d1,%d0
         moveq   #0,%d1
         move.w  0(%a2),%d1

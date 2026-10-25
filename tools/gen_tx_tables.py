@@ -158,6 +158,13 @@ X9S_A0, X9S_T30 = 0.16, 1.1          # start level (MD full scale, ACC 96), t-30
 # On the MKII (unit, 2026-10-25) the partial measured 0..-5 dB under the main (40-200 ms
 # spectra), the MD -6 dB on all eight hits, the design ~-5 dB: X9S_K is trimmed by this there.
 X9S_MK2_TRIM_DB = -3.5
+# With that trim (unit, TX8EH, 2026-10-25, 9 takes, TYPE 0/1/2 x PTC 0/64/127) the partial still
+# rose with the main's pitch: re the main, dB = X9S_MK2_FIT_A + X9S_MK2_FIT_B log2(f), 0.5 dB rms
+# over 65..188 Hz. The MD reads -7 dB at 68 Hz and -6 dB at 99..145 Hz (X9S_MD_DB), so x9_sg
+# scales the partial by MD - fit, held at the ends of the measured range.
+X9S_MK2_FIT_A, X9S_MK2_FIT_B = -38.25, 4.93
+X9S_MK2_FIT_F = (65.0, 188.0)
+X9S_MD_DB = {68: -7.0, 99: -6.0, 145: -6.0}
 # TX-8 BD ATK starts the kick on a segment at ~2.2x the pitch (half-periods 2.0 ms at
 # PTCH 127, body 4.7 ms), ~0.067 ms per ATK step long, then the body (emulator).
 TX8BD_ATK_RATIO, TX8BD_ATK_MS_PER_STEP = 2.2, 0.067
@@ -464,6 +471,17 @@ def toms() -> list[str]:
     return out
 
 
+def x9_sg() -> list[str]:
+    """MKII only: the partial's gain for the main's TUN (TUN >> 10, interpolated), Q14."""
+    lo, hi = X9S_MK2_FIT_F
+    vals = []
+    for i in range(33):
+        f = min(hi, max(lo, RYTM_XT_F0 * 2 ** ((1024 * i - 0x4000) / 6144)))
+        md = at(X9S_MD_DB, min(max(f, 68), 145))
+        vals.append(16384 * 10 ** ((md - (X9S_MK2_FIT_A + X9S_MK2_FIT_B * math.log2(f))) / 20))
+    return words("x9_sg", vals, "TX-9 tom partial (MKII): gain for TUN >> 10, Q14 (--mk2-x9s)")
+
+
 def x9_sub() -> list[str]:
     """The TX-9 tom's second partial: a sine at exactly 2/3 of the main pitch (all
     TYPEs and PTCHs, emulator, 120 ms windows), ~5 dB under it, decaying ~1.1x as
@@ -712,6 +730,7 @@ def main():
     if "--mk2-x9s" in sys.argv:
         k = X9S_A0 * 65536 * max(X9_PEAK.values()) / at(X9_PEAK, 96) * 10 ** (X9S_MK2_TRIM_DB / 20)
         print(f"        .equ    X9S_K, {round(k)}   | {X9S_MK2_TRIM_DB} dB on the MKII (--mk2-x9s)")
+        print("\n".join(x9_sg()))
         return
     if "--mk2-bt8" in sys.argv:
         print("\n".join(bt8(mk2=True)))
