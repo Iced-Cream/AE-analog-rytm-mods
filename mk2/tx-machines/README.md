@@ -10,13 +10,13 @@ refitted to the MKII's BT CLASSIC.
 |---|---|---|---|---|
 | 36 | BD TX-9 | BD | LEV PTC DEC TUN DPT ACC WAV ATK | BD CLASSIC, plus the TX-9's click |
 | 37 | SD TX-9 | SD | LEV PTC DEC TON SNP ACC BND DTU | SD CLASSIC, plus the TX-9's own noise |
-| 38 | SD TX-8 | SD | LEV PTC DEC TON SNP ACC DET TRA | SD CLASSIC, plus the TX-8's noise (0.2, untested) |
-| 39 | XT TX-9 | LT, MT, HT | LEV PTC DEC TYP ACC BND NOI TON | XT CLASSIC; TYP picks LT, MT or HT tuning (0.2, untested) |
-| 40 | XT TX-8 | LT, MT, HT | LEV PTC DEC TYP TUN ACC DIO NOI | XT CLASSIC (0.2, untested) |
-| 41 | BD TX-9 DIGI | BD | LEV PTC DEC TUN DPT ACC WAV ATK | BD TX-9 with the digital wave (0.2, untested) |
-| 42 | BT TX-8 | BT | LEV PTC DEC SIG ACC HLD NOI ATK | its own tone and noise on the BT voice (0.2, untested) |
+| 38 | SD TX-8 | SD | LEV PTC DEC TON SNP ACC DET TRA | SD CLASSIC, plus the TX-8's noise |
+| 39 | XT TX-9 | LT, MT, HT | LEV PTC DEC TYP ACC BND NOI TON | XT CLASSIC; TYP picks LT, MT or HT tuning |
+| 40 | XT TX-8 | LT, MT, HT | LEV PTC DEC TYP TUN ACC DIO NOI | XT CLASSIC |
+| 41 | BD TX-9 DIGI | BD | LEV PTC DEC TUN DPT ACC WAV ATK | BD TX-9 with the digital wave |
+| 42 | BT TX-8 | BT | LEV PTC DEC SIG ACC HLD NOI ATK | its own tone and noise on the BT voice |
 
-Pick them with the machine knob on the BD and SD tracks, as any machine.
+Pick them with the machine knob on their tracks, as any machine.
 
 ## How it works
 
