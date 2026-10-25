@@ -4,9 +4,10 @@
         | TX samples. 33-entry tables: p >> 2, linear over p & 3. The MKII's BD
         | CLASSIC and SD CLASSIC were recorded on a unit at the MK1 recordings'
         | settings and match them (README), so the MK1 tuning carries over.
-        | BT TX-8's BT8_TUNOFF, b8_dec and b8_dq are the exception: the MKII's
-        | BT CLASSIC rings longer, so they come from MKII recordings
-        | (tools/gen_tx_tables.py --mk2-bt8).
+        | Two exceptions come from MKII recordings: BT TX-8's BT8_TUNOFF,
+        | b8_dec and b8_dq (the MKII's BT CLASSIC rings longer;
+        | tools/gen_tx_tables.py --mk2-bt8) and the XT TX-9 partial's X9S_K
+        | (--mk2-x9s).
 
         .text
 
@@ -443,7 +444,7 @@ a9_wave:                       | TX-9 BD: attack waveform, 48 kHz, 8 bit of its 
         .byte   0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1
         .byte   1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         .byte   0, 0, 0, 0, 0, 0, 0, 0
-        .equ    X9S_K, 13193
+        .equ    X9S_K, 8817   | -3.5 dB on the MKII (--mk2-x9s)
 
         .align  2
 x9_sinc:                       | TX-9 tom partial: phase step per sample, TUN >> 10

@@ -155,6 +155,9 @@ X9_HOLD_FRAC, X9_TAIL_FRAC, X9_T30_TYPE12 = 0.12, 0.9, 0.68
 # Second partial at 2/3 f (TYPE 0 DEC 127, 120 ms windows: 61 Hz at -6.5 / -5.2 / -4.7 /
 # -4.3 dB re the 91.5 Hz main at 70 / 130 / 190 / 250 ms; 0.062 dB/ms, the main 0.072).
 X9S_A0, X9S_T30 = 0.16, 1.1          # start level (MD full scale, ACC 96), t-30 / main's
+# On the MKII (unit, 2026-10-25) the partial measured 0..-5 dB under the main (40-200 ms
+# spectra), the MD -6 dB on all eight hits, the design ~-5 dB: X9S_K is trimmed by this there.
+X9S_MK2_TRIM_DB = -3.5
 # TX-8 BD ATK starts the kick on a segment at ~2.2x the pitch (half-periods 2.0 ms at
 # PTCH 127, body 4.7 ms), ~0.067 ms per ATK step long, then the body (emulator).
 TX8BD_ATK_RATIO, TX8BD_ATK_MS_PER_STEP = 2.2, 0.067
@@ -706,6 +709,10 @@ def render() -> str:
 
 
 def main():
+    if "--mk2-x9s" in sys.argv:
+        k = X9S_A0 * 65536 * max(X9_PEAK.values()) / at(X9_PEAK, 96) * 10 ** (X9S_MK2_TRIM_DB / 20)
+        print(f"        .equ    X9S_K, {round(k)}   | {X9S_MK2_TRIM_DB} dB on the MKII (--mk2-x9s)")
+        return
     if "--mk2-bt8" in sys.argv:
         print("\n".join(bt8(mk2=True)))
         return

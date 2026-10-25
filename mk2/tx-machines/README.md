@@ -109,6 +109,19 @@ TX8DH) BT TX-8 then rings within -7..+9 % of the TX-8's table everywhere:
 fits.) CPU with BT TX-8 playing: about 72 %, DSP peak 73.3 %. CPU with all five
 new machines playing: 80.5-83.1 %, DSP peak 89.2 % at the hit.
 
+**XT TX-9 partial trim** (25 Oct 2026, offline): on the unit the XT TX-9's
+2/3 partial sat 0..-5 dB under the main tone (spectra 40-200 ms after the
+hit), against the MD's -6 dB on all eight hits and the author's ~-5 dB.
+X9S_K is lowered 3.5 dB on the MKII (tools/gen_tx_tables.py --mk2-x9s); the
+partial's TYPE 1/2 decay already follows the main's 1.47x. Not yet
+rechecked on the unit.
+
+**Known limits, as on the MK1 port:** XT TX-8's longest decays reach about
+1.1 s against the MD's ~3 s, because the stock XT CLASSIC damps hard past
+~1.5 s (the author notes this). SD TX-9's fifth (the second oscillator at
+1.5x) is 20-25 dB weaker than on the MD. Both are left as the MK1 port has
+them.
+
 **0.1 (BD TX-9, SD TX-9):**
 
 **Emulator** (rytm-emu, OS 1.74, 23 Oct 2026, builds TX74 to TX7E): BD TX-9
