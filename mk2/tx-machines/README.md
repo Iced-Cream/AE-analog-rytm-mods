@@ -113,8 +113,12 @@ new machines playing: 80.5-83.1 %, DSP peak 89.2 % at the hit.
 2/3 partial sat 0..-5 dB under the main tone (spectra 40-200 ms after the
 hit), against the MD's -6 dB on all eight hits and the author's ~-5 dB.
 X9S_K is lowered 3.5 dB on the MKII (tools/gen_tx_tables.py --mk2-x9s); the
-partial's TYPE 1/2 decay already follows the main's 1.47x. Not yet
-rechecked on the unit.
+partial's TYPE 1/2 decay already follows the main's 1.47x. On the unit
+(25 Oct 2026, TX8EH, 9 takes) the partial came out 3-4 dB lower at every
+setting: TYPE 0 reads -9 / -6 / -5 dB at 65 / 96 / 128 Hz (MD -7 at 68 Hz,
+-6 at 99-145 Hz), but it still rises about 4 dB per octave of the main, so
+TYPE 1/2 at high PTC (140-190 Hz) sit at -4..-1 dB. t30 and pitch are
+unchanged.
 
 **Known limits, as on the MK1 port:** XT TX-8's longest decays reach about
 1.1 s against the MD's ~3 s, because the stock XT CLASSIC damps hard past
