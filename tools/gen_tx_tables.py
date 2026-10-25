@@ -116,6 +116,10 @@ BT_MK2_T30_F = [(24.5, 1890.0), (25.1, 1960.0), (30.4, 1905.0), (37.8, 2100.0), 
 # 16 / 75 (49.7 Hz), 0.68 / 0.86 / 0.94 of the separable model: short decays fall off
 # faster than it says. The model is scaled by that, linear between, constant beyond.
 BT_MK2_CORR = {0: 0.681, 16: 0.863, 75: 0.941}
+# Nor is pitch separable at the ends: on the unit (2026-10-25) BT TX-8 at PTC 0 (24.85 Hz)
+# rang 1.7-2.0x the model (975 / 1395 ms at BT DEC 15 / 27), at PTC 127 (99.4 Hz) 0.80-0.85x
+# (205 / 190 ms at BT DEC 85 / 73). G is scaled by this, log-linear in log f, 1 at 49.7 Hz.
+BT_MK2_GCORR = [(24.85, 2.0), (49.7, 1.0), (99.4, 0.82)]
 TX8_F64 = 49.7                       # the TX-8 BD at PTCH 64 (WAVS3: 49.4 .. 49.8 Hz)
 TX9_F64 = 56.0                       # the TX-9 BD at PTCH 64 (WAVS2/3 tails: 56.0 Hz)
 # BD TX-9 DIGI's decay: the emulator table, x the real MD's ratio to it (WAVS3: t30 80 /
@@ -483,6 +487,18 @@ def bt_g(f: float, pts=None) -> float:
     return t0 * math.exp(math.log(t1 / t0) * math.log(f / f0) / math.log(f1 / f0))
 
 
+def bt_gcorr(f: float) -> float:
+    """BT_MK2_GCORR at f: log-linear in log f between its points, held beyond."""
+    c = BT_MK2_GCORR
+    if f <= c[0][0]:
+        return c[0][1]
+    if f >= c[-1][0]:
+        return c[-1][1]
+    i = 0 if f < c[1][0] else 1
+    (f0, c0), (f1, c1) = c[i], c[i + 1]
+    return c0 * math.exp(math.log(c1 / c0) * math.log(f / f0) / math.log(f1 / f0))
+
+
 def bt8(mk2: bool = False) -> list[str]:
     """BT TX-8: the TX-8 BD on the BT voice's resonator (BT CLASSIC run every block).
     PTC -> TUN (49.7 Hz at PTC 64, two octaves over PTC; TUN = a quarter semitone);
@@ -496,6 +512,8 @@ def bt8(mk2: bool = False) -> list[str]:
     else:
         t_dec, f_dec, pts, f64 = BT_T30_77, 77.0, BT_T30_F, BT_F64
     g_ref = bt_g(f_dec, pts)
+    if mk2:
+        pts = [(f, t * bt_gcorr(f)) for f, t in pts]
     def bt_dec(t30, f):
         want = t30 * g_ref / bt_g(f, pts)
         return min(range(128), key=lambda q: abs(math.log(at(t_dec, q) / want)))

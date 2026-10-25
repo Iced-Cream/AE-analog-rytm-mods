@@ -92,7 +92,11 @@ on the MKII rings 1.3-1.7x longer than the MK1's that its tables were fitted
 to (same pitch). So BT TX-8's decay tables are refitted from the MKII's BT
 CLASSIC (19 takes, 25 Oct 2026: t30 25..965 ms over DEC 0..127 at 75 Hz,
 against the MK1's 60..650 ms) and scaled by what BT TX-8 measured on the
-unit; the recheck on the unit is pending. CPU with all five
+unit, at PTC 64 and at both ends of PTC. The first refit (a655eb4) put DEC
+on the MD on the unit (t30 60 / 430 / 1250 ms at DEC 0 / 64 / 127, MD 60 /
+410 / 1200) but PTC 0 rang 1395 ms (MD 665, the TX-8 table 823): BT CLASSIC's
+decay is flat below ~38 Hz, which the model missed. The second refit corrects
+the pitch term at both ends; its recheck on the unit is pending. CPU with all five
 new machines playing: 80.5-83.1 %, DSP peak 89.2 % at the hit.
 
 **0.1 (BD TX-9, SD TX-9):**
