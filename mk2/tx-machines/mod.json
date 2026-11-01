@@ -1,0 +1,146 @@
+{
+ "id": "tx-machines",
+ "version": "0.2",
+ "title": "TX machines",
+ "category": "Sound",
+ "author": "hugz202 (AE-analog-rytm-mods); MKII port: Iced-Cream",
+ "license": "MIT",
+ "description": "The Machinedrum's TX machines on the analog voices, ported from the MK1 mod. BD TX-9 (LEV PTC DEC TUN DPT ACC WAV ATK) and BD TX-9 DIGI run BD CLASSIC on the BD track with the TX-9's sweep, hold, decay and accent computed every audio block plus its click; SD TX-9 (LEV PTC DEC TON SNP ACC BND DTU) and SD TX-8 (LEV PTC DEC TON SNP ACC DET TRA) run SD CLASSIC on the SD track plus their own noise; XT TX-9 and XT TX-8 (TYP picks LT, MT or HT tuning) run XT CLASSIC on the MT/HT voices; BT TX-8 runs on the BT voice with its own hold and noise. They sit in the hidden machine slots 36 to 42 through core-ar2 0.5's machine table, and their knobs are those slots' parameter records, so a sound stores them as any machine's; a kit naming them loads on a build without the mod with that track set to DISABLE. Port of AE-analog-rytm-mods 0009-tx-machines (Analog Rytm MK1).",
+ "device": "analog-rytm-mk2",
+ "os": "1.74",
+ "sources": [
+  "tx-machines.s"
+ ],
+ "resources": {
+  "core": "0.5"
+ },
+ "subscribe": [
+  {
+   "event": "ev_tick",
+   "fn": "tx_machines_tick",
+   "order": 50
+  }
+ ],
+ "contribute": [
+  {
+   "to": "core_machines",
+   "order": 50,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:tx_machines_bd9",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_machines",
+   "order": 51,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:tx_machines_sd9",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_machines",
+   "order": 52,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:tx_machines_sd8",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_machines",
+   "order": 53,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:tx_machines_xt9",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_machines",
+   "order": 54,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:tx_machines_xt8",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_machines",
+   "order": 55,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:tx_machines_bd9d",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_machines",
+   "order": 56,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:tx_machines_bt8",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_params",
+   "order": 50,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:tx_machines_typ9",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_params",
+   "order": 51,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:tx_machines_typ8",
+     0
+    ]
+   ]
+  }
+ ],
+ "requires": [
+  "core"
+ ]
+}
