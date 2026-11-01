@@ -187,7 +187,24 @@ analoghealth, unit T0 -49974 LT / -50015 MT):
   -19. The MD's fifth also falls 1-4 dB faster than the body, which is left
   for the next take.
 
-The refit is not yet on a unit.
+**0.3 refit, unit** (T63, 1 Nov 2026, TX4SH / TX04H = f3b7841 +
+analoghealth). A sweep at 16-unit steps puts zero damping at about 112 /
+93 / 105 units past stock's longest word (LT 90, MT 140 / 191 Hz). The
+decay rate falls almost linearly with the offset, and every note ended.
+XT TX-8 now rings as follows, and no setting self-oscillates:
+
+| XT TX-8 t30, DEC 96 / 112 / 127 | 0.3 | TX-8 target | 0.2 at DEC 127 |
+|---|---|---|---|
+| LT 90 Hz | 1.15 / 1.95 / 2.65 s | 0.97 / 1.72 / 2.99 s | 2.11 s |
+| MT 140 Hz | 0.88 / 1.40 / 2.27 s | 0.65 / 1.14 / 1.98 s | 1.08 s |
+| MT 191 Hz | 0.60 / 0.80 / 1.40 s | 0.48 / 0.85 / 1.48 s | 0.53 s |
+
+DEC 112-127 are within about 0.2 octave of the targets. DEC 96 runs 0.2-0.4
+octave long, from the x8_dec table that 0.2 already had. The largest move
+used is 65 units, 28 under the lowest zero point measured. SD TX-9's fifth
+reads -9.8 / -10.7 dB re the body at DEC 64 / 127 (MD -12.3 / -9.6), at
+276 Hz on a 192 Hz body. Its decay is close to the MD's, which falls 2-4 dB
+faster at DEC 64. The constants stay as they are.
 
 **0.1 (BD TX-9, SD TX-9):**
 
