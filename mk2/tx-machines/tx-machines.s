@@ -58,6 +58,10 @@
         .equ    VOICE_BUF_A,    0x80006bf8        | stream 1, 0x80 (one block) each
         .equ    MACSR_FRAC,     0x20
 
+        .ifndef X8_SWEEP                          | 1: XT TX-8's word-sweep test build
+        .equ    X8_SWEEP, 0                       | (mod.json defsym), never released
+        .endif
+
         .equ    TUN_BASE, 0x3a00                  | BD/SD CLASSIC's default tune
         .equ    TUN_MAX,  0x7f00
 
@@ -380,6 +384,9 @@ tx9sd_machine:
         move.l  %d0,(%a3)
         moveq   #1,%d0
         move.l  %d0,n9_state+N9S_TRIG             | arm the noise envelope
+        lea     s9f_state,%a0                     | start the fifth (0.3)
+        move.l  #0x7fffffff,(%a0)
+        clr.l   4(%a0)
 1:      LOOKUP  t9sd_ptc,%d2
         move.l  %d0,%d4
         add.l   #TUN_BASE,%d4
@@ -407,13 +414,118 @@ tx9sd_machine:
         PARAM   14,%d5
         LOOKUP  t9sd_det,%d5
         move.w  %d0,F_BLOCK+6(%sp)                | DET
+        move.l  %d0,%d3                           | (kept for the fifth)
         clr.l   F_BLOCK+8(%sp)                    | SNP 0, NOD 0: no stock snap
         clr.w   F_BLOCK+12(%sp)                   | NOL 0: no stock noise
         move.w  #0x2000,%d0
         move.w  %d0,F_BLOCK+14(%sp)               | BAL: SD CLASSIC's default
         CALLSTOCK STOCK_SD_CLASSIC
+        jsr     s9_fifth                          | the fifth, digital (0.3)
         jsr     tx9_noise                         | the TX-9's own noise, digital
         EXIT
+
+        | ==================================================== SD TX-9 fifth (0.3)
+        | The TX-9 snare's second oscillator, at osc 1 x the DTU ratio (a fifth
+        | at DTU 64). SD CLASSIC's osc 2 sits at that pitch but can't be brought
+        | up to the Machinedrum's -10..-12 dB re the body: BAL crossfades the two
+        | oscillators (osc 2 = u, osc 1 = 1 - u, 0x4010987c), and at the BAL
+        | 0x2000 SD TX-9 sends osc 2 is -43 dB; -12 dB needs BAL ~115, which
+        | takes ~20 dB off the body (unit, T58). So it is played here, as XT
+        | TX-9's 2/3 partial is: a sine at TUN + DET (SD CLASSIC's tune word,
+        | 3072 an octave, the bend included, the same word osc 2 gets), G = S9F_K
+        | * acc^2 * LEV * env, S9F_DB re the body's MD peak, env falling at the
+        | body's T40 for DEC (s9f_dec). SD CLASSIC writes all 32 longs of stream
+        | 1 every call and tx9_noise adds into it after this, so the fifth is
+        | added too. BAL stays 0x2000, so the body keeps its level. Once env is
+        | under -60 dB it stops until the next note.
+        | In: d3 DET word, d4 TUN word, d6 voice, a2 params. Clobbers d0-d3,
+        | d5, d7, a0, a4.
+        .align  2
+s9_fifth:
+        lea     s9f_state,%a4                     | env (Q31), phase
+        move.l  (%a4),%d5
+        bne.s   1f
+        rts
+1:      cmp.l   #0x00200000,%d5                   | under -60 dB: done
+        bge.s   2f
+        clr.l   (%a4)
+        rts
+2:      add.l   %d4,%d3                           | the fifth's tune word,
+        bge.s   21f                               | 0..0x7fff
+        moveq   #0,%d3
+21:     cmp.l   #0x7fff,%d3
+        ble.s   22f
+        move.l  #0x7fff,%d3
+22:     PARAM   4,%d2                             | env *= decay(DEC)
+        lea     s9f_dec,%a0
+        move.l  %d2,%d0
+        jsr     interpl
+        mac.l   %d5,%d0,%acc0
+        movclr.l %acc0,%d5
+        move.l  %d5,(%a4)
+        PARAM   10,%d2                            | G = K * acc^2 * LEV * env
+        LOOKUP  t9sd_acc,%d2
+        mulu.l  %d0,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        move.l  #S9F_K,%d1
+        mulu.l  %d1,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        moveq   #0,%d1
+        move.w  0(%a2),%d1
+        mulu.l  %d1,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        move.l  %d5,%d1
+        swap    %d1
+        and.l   #0xffff,%d1
+        mulu.l  %d1,%d0
+        moveq   #15,%d1
+        lsr.l   %d1,%d0
+        cmp.l   #65000,%d0
+        bls.s   3f
+        move.l  #65000,%d0
+3:      move.l  %d0,%d5
+        move.l  %d3,%d0                           | phase step: s9f_inc at
+        moveq   #9,%d1                            | word >> 9, linear over the
+        lsr.l   %d1,%d0                           | low 9 bits
+        lea     s9f_inc,%a0
+        lsl.l   #2,%d0
+        add.l   %d0,%a0
+        move.l  (%a0),%d2
+        move.l  4(%a0),%d0
+        sub.l   %d2,%d0
+        asr.l   #5,%d0
+        and.l   #0x1ff,%d3
+        muls.l  %d3,%d0
+        asr.l   #4,%d0
+        add.l   %d0,%d2
+        move.l  %d2,%d3
+        move.l  %d6,%d0
+        lsl.l   #7,%d0
+        add.l   #VOICE_BUF_A,%d0
+        movea.l %d0,%a0
+        move.l  4(%a4),%d2
+        moveq   #32,%d7
+4:      add.l   %d3,%d2
+        move.l  %d2,%d0
+        swap    %d0
+        ext.l   %d0                               | x, Q15
+        move.l  %d0,%d1
+        bpl.s   5f
+        neg.l   %d1
+5:      sub.l   #32768,%d1                        | |x| - 1
+        muls.l  %d1,%d0
+        neg.l   %d0                               | x (1 - |x|), Q30 / 4
+        asr.l   #8,%d0
+        asr.l   #5,%d0                            | s, Q15
+        muls.l  %d5,%d0
+        add.l   %d0,(%a0)+
+        subq.l  #1,%d7
+        bne.s   4b
+        move.l  %d2,4(%a4)
+        rts
 
         | ==================================================== TX-9 SD noise
         | The TX-9 SNARE DRUM's noise, ported exactly (tables.inc, the MK1 repo's
@@ -806,6 +918,7 @@ tx8xt_machine:
         jsr     note_on
         bne.s   1f
         move.l  #0x7fffffff,(%a3)
+        clr.l   4(%a3)                            | blocks since the note
 1:      moveq   #0,%d0
         move.w  6(%a2),%d0
         lsr.l   #8,%d0                            | TYPE 0..2 (LT MT HT)
@@ -825,13 +938,23 @@ tx8xt_machine:
         add.l   %d1,%d0
         asr.l   #3,%d0
         add.l   %d0,%d4
+        .if     X8_SWEEP == 0
         PARAM   8,%d2                             | + fine TUNE
         LOOKUP  x8_tune,%d2
         add.l   %d0,%d4
+        .endif
         move.l  #X8_B,%d3
         PARAM   4,%d2                             | DEC word from DEC and the pitch
         LOOKUP  x8_dec,%d2
         add.l   %d0,%d3
+        move.l  %d4,%d0                           | a5 = idx past stock's longest
+        move.l  #X8_KP,%d1                        | DEC word (0.3), 1/16 octave of
+        muls.l  %d1,%d0
+        moveq   #16,%d1                           | t30: idx as xt_dec forms it,
+        asr.l   %d1,%d0                           | before its clamp, less X8_ISAT
+        add.l   %d3,%d0
+        sub.l   #X8_ISAT,%d0
+        movea.l %d0,%a5
         move.l  #X8_KP,%d1
         jsr     xt_dec
         move.w  %d0,F_BLOCK+4(%sp)
@@ -863,7 +986,98 @@ tx8xt_machine:
         move.w  %d0,F_BLOCK+12(%sp)               | NOL <- NOI
         move.w  #0x4000,%d0
         move.w  %d0,F_BLOCK+14(%sp)               | TON: XT CLASSIC's default
-        LEAVE   STOCK_XT_CLASSIC
+        jsr     x8_hold
+        CALLSTOCK STOCK_XT_CLASSIC
+        jsr     x8_ext
+        EXIT
+
+        | XT TX-8's long decays (0.3). XT CLASSIC writes its damping word to
+        | the voice's frame (its 2nd argument) at +0x7c (voice 3, LT) or +0x80
+        | (voice 5, MT/HT): (-T0 512 / (DEC + 256) + T1 / 4096 + T0 (p - 0.125))
+        | >> 4, clamped to +-32767, T0 the voice's calibration long (0x42fb6b78
+        | LT, 0x42fb6b80 MT). The DEC term only falls toward 0 as DEC grows, so
+        | stock's longest ring is ~2.15 s at 91 Hz, 1.1 s at 141 Hz, 0.6 s at
+        | 191 Hz (unit, T58), against the TX-8's ~3 s. A smaller |damping| in
+        | T0's direction rings longer (T0 < 0 on the unit: a smaller word), and
+        | the word sits ~32,000 from the clamp (T57). So once stock has written
+        | it, x8_ext moves the word on in T0's direction by X8_XK (Q10) * T0 / 16
+        | per octave of t30 that the DEC table asks for past stock's range
+        | (a5 = that excess in 1/16 octave, from tx8xt_machine).
+        |
+        | X8_SWEEP (a test build, never released) instead moves it by 32 word
+        | units per step of the TUN knob (fine tune off), at any DEC, so one
+        | unit run can map word against t30: TUN 0, 2, 4 .. 127 = 0, 64, 128
+        | .. 4064 units.
+        |
+        | x8_hold: stock counts blocks since the note in the voice's state long
+        | +0x10 and, past 4500 (3.0 s), adds (n - 4500) to the damping word every
+        | block (past 9000 the pitch drifts as well), which cut the TX-8's long
+        | rings. While an XT TX-8 note is under X8_HOLD blocks old, the count is
+        | held at X8_HCNT, under 4500; after that it runs on from there and
+        | stock's ramp ends the note as before, so a word too far past stock's
+        | range can never ring for good.
+        .align  2
+x8_hold:
+        move.l  4(%a3),%d0
+        addq.l  #1,4(%a3)
+        cmp.l   #X8_HOLD,%d0
+        bcc.s   9f
+        move.l  %d6,%d0
+        lsl.l   #5,%d0
+        lea     VOICE_STATE+0x10,%a0
+        add.l   %d0,%a0
+        move.l  #X8_HCNT,%d0
+        cmp.l   (%a0),%d0
+        bge.s   9f
+        move.l  %d0,(%a0)
+9:      rts
+
+        | After XT CLASSIC: d6 voice, a2 params, a5 the excess (above), the
+        | frame at A_CTX + 4 (this routine's return address). Clobbers d0, d1, a0, a1.
+        .align  2
+x8_ext:
+        moveq   #3,%d0
+        cmp.l   %d0,%d6
+        bne.s   1f
+        lea     0x42fb6b78,%a1                    | LT: T0, frame +0x7c
+        moveq   #0x7c,%d1
+        bra.s   2f
+1:      moveq   #5,%d0
+        cmp.l   %d0,%d6
+        bne.s   9f
+        lea     0x42fb6b80,%a1                    | MT/HT: T0, frame +0x80
+        move.l  #0x80,%d1
+2:      move.l  A_CTX+4(%sp),%a0
+        add.l   %d1,%a0
+        .if     X8_SWEEP
+        PARAM   8,%d0                             | TUN step * 32, in T0's direction
+        lsl.l   #5,%d0
+        tst.l   (%a1)
+        bge.s   3f
+        neg.l   %d0
+        .else
+        move.l  %a5,%d0                           | excess, 1/16 octave
+        tst.l   %d0
+        ble.s   9f
+        move.l  (%a1),%d1
+        asr.l   #4,%d1                            | T0 / 16: the word per pitch octave
+        muls.l  %d1,%d0
+        move.l  #X8_XK,%d1
+        muls.l  %d1,%d0
+        moveq   #14,%d1                           | / 16 (octaves) / 1024 (Q10)
+        asr.l   %d1,%d0
+        .endif
+3:      move.w  (%a0),%d1
+        ext.l   %d1
+        add.l   %d1,%d0
+        cmp.l   #32767,%d0
+        ble.s   4f
+        move.l  #32767,%d0
+4:      cmp.l   #-32767,%d0
+        bge.s   5f
+        move.l  #-32767,%d0
+5:      move.w  %d0,(%a0)
+9:      rts
 
         | ==================================================== BT TX-8 (slot 42)
         | The TX-8 BD on the BT voice's resonator: BT CLASSIC run every block, the
@@ -1563,6 +1777,7 @@ t8sd_state:     .space  8 * 8
 x9_state:       .space  8 * 8
 x9sub_state:    .space  8 * 8
 x8_state:       .space  8 * 8
+s9f_state:      .space  8                         | SD TX-9 fifth (voice 2 only): env, phase
 b8_state:       .space  8 * 8
 d9_state:       .space  8 * 8
 d9_ext:         .space  20                        | voice 0 only: the mask allows no other

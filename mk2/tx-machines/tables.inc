@@ -7,7 +7,8 @@
         | Two exceptions come from MKII recordings: BT TX-8's BT8_TUNOFF,
         | b8_dec and b8_dq (the MKII's BT CLASSIC rings longer;
         | tools/gen_tx_tables.py --mk2-bt8) and the XT TX-9 partial's X9S_K
-        | (--mk2-x9s).
+        | (--mk2-x9s). 0.3 adds, at the end, XT TX-8's long-decay constants
+        | (--mk2-x8x) and SD TX-9's fifth (--mk2-s9f).
 
         .text
 
@@ -469,3 +470,42 @@ x9_sd:                       | TX-9 tom partial: (1 - decay per block) * 2^21, f
         .short  20509, 19550, 18677, 17878, 17145, 16547, 15989, 15468, 14980, 14510, 14068
         .short  13652, 13261, 12996, 12741, 12496, 12261, 12092, 11927, 11768, 11612, 11423
         .short  11240, 11063, 10892, 10739, 10590, 10445, 10304, 10246, 10189, 10133, 10091
+
+        .equ    X8_ISAT, 103   | idx of DEC 0x7f00 (xt_dxt), 1/16 octave (--mk2-x8x)
+        .equ    X8_XK, 52   | word moved per octave of t30 past it, T0 / 16, Q10
+        .equ    X8_HOLD, 9000   | blocks from the note the 3 s cut is held off
+        .equ    X8_HCNT, 4400   | stock's block count held there (< 4500)
+
+        .equ    S9F_K, 11082   | -11.0 dB re the body (--mk2-s9f)
+
+        .align  2
+s9f_inc:                       | SD TX-9 fifth: phase step per sample, (TUN + DET) >> 9
+        .long   0x0007e15e, 0x0008d86b, 0x0009edb9, 0x000b24fc
+        .long   0x000c825e, 0x000e0a89, 0x000fc2bb, 0x0011b0d5
+        .long   0x0013db71, 0x001649f9, 0x001904bc, 0x001c1513
+        .long   0x001f8576, 0x002361aa, 0x0027b6e3, 0x002c93f1
+        .long   0x00320979, 0x00382a25, 0x003f0aec, 0x0046c354
+        .long   0x004f6dc5, 0x005927e2, 0x006412f2, 0x0070544b
+        .long   0x007e15d9, 0x008d86a9, 0x009edb8a, 0x00b24fc5
+        .long   0x00c825e3, 0x00e0a896, 0x00fc2bb2, 0x011b0d51
+        .long   0x013db714, 0x01649f8a, 0x01904bc7, 0x01c1512c
+        .long   0x01f85764, 0x02361aa2, 0x027b6e28, 0x02c93f14
+        .long   0x0320978e, 0x0382a257, 0x03f0aec7, 0x046c3545
+        .long   0x04f6dc50, 0x05927e28, 0x06412f1c, 0x070544af
+        .long   0x07e15d8e, 0x08d86a89, 0x09edb8a0, 0x0b24fc4f
+        .long   0x0c825e38, 0x0e0a895e, 0x0fc2bb1c, 0x11b0d512
+        .long   0x13db7141, 0x1649f89e, 0x1904bc70, 0x1c1512bc
+        .long   0x1f857639, 0x2361aa25, 0x27b6e281, 0x2c93f13c
+        .long   0x320978df
+
+        .align  2
+s9f_dec:                       | SD TX-9 fifth: amplitude per block for DEC (the body's T40), Q31
+        .long   0x75402144, 0x75f02c6f, 0x768b0ef9, 0x771461a0
+        .long   0x778ef7bc, 0x7830045e, 0x78babbd1, 0x793375e3
+        .long   0x799d7bb6, 0x7a4efe58, 0x7addbaee, 0x7b52ffa3
+        .long   0x7bb50e60, 0x7c14eca2, 0x7c6568c3, 0x7ca9f034
+        .long   0x7ce4fdc0, 0x7d25e5a9, 0x7d5d0157, 0x7d8c60db
+        .long   0x7db589c4, 0x7de3f8c9, 0x7e0b979b, 0x7e2dcbe1
+        .long   0x7e4b9fba, 0x7e726cfb, 0x7e92e400, 0x7eae7430
+        .long   0x7ec625c7, 0x7ee18d75, 0x7ef88e56, 0x7f0c23b5
+        .long   0x7f19046e
