@@ -128,14 +128,24 @@ BT_MK2_GCORR = [(24.85, 2.0), (49.7, 1.0), (99.4, 0.82)]
 # word T0 / 16 for 1.75 octaves of t30, so the true slope may be far steeper; the word sweep
 # (X8_SWEEP build) decides, then X8_MK2_XK is refitted. The 3 s tail cut is held off for
 # X8_MK2_HOLD blocks (6 s), the stock block count held at X8_MK2_HCNT.
-X8_MK2_XK = 0.0151 / 0.30
+# Unit, T59 (2026-11-01): the analog damping is far steeper than that. At X8_XK 0.0503 the
+# word moved -100 / -199 / -268 units at DEC 127 (LT 91, MT 141 / 191 Hz) and rang ~17 s or
+# self-oscillated; the X8_SWEEP build (32 units a step) self-oscillated from 512 units at
+# every pitch, zero damping lying ~90-115 units past stock's longest word. A fit of the
+# release takes gives 12.5 / 1024 at X8_ISAT 103, 0.13 octave rms; the move is also capped
+# at X8_MK2_XMAX units, under the ~90 of zero damping, so no setting can self-oscillate.
+X8_MK2_XK = 12.5 / 1024
+X8_MK2_XMAX = 70
 X8_MK2_HOLD, X8_MK2_HCNT = 9000, 4400
 # 0.3 (--mk2-s9f): SD TX-9's fifth. SD CLASSIC's osc 2 can't carry it (unit, T58: at BAL
 # 32 it sits -43 dB re the body, and the MD's -10..-12 dB needs BAL ~115, which takes ~20
 # dB off the body), so it is played digitally into stream 1 at osc 2's pitch (TUN + DET,
 # the bend included), S9F_DB re the body's MD peak, decaying with the body (T40 for DEC;
 # the MD takes may show otherwise, then this is refitted).
-S9F_DB = -11.0
+# Unit, T59: at -11.0 the fifth read -1.8 / -2.7 dB re the body (DEC 64 / 127, 40-200 ms),
+# the MD -12.3 / -9.6 dB: 7..10.5 dB hot, so -19. (The MD's fifth also falls 1-4 dB faster
+# than the body; left for the next unit take.)
+S9F_DB = -19.0
 TX8_F64 = 49.7                       # the TX-8 BD at PTCH 64 (WAVS3: 49.4 .. 49.8 Hz)
 TX9_F64 = 56.0                       # the TX-9 BD at PTCH 64 (WAVS2/3 tails: 56.0 Hz)
 # BD TX-9 DIGI's decay: the emulator table, x the real MD's ratio to it (WAVS3: t30 80 /
@@ -517,7 +527,8 @@ def x9_sub() -> list[str]:
 def x8_mk2_ext() -> list[str]:
     """MKII 0.3: XT TX-8 past stock's DEC range (x8_hold, x8_ext in tx-machines.s)."""
     return [f"        .equ    X8_ISAT, {round(16 * (RYTM_XT_DEC_HI + 6))}   | idx of DEC 0x7f00 (xt_dxt), 1/16 octave (--mk2-x8x)",
-            f"        .equ    X8_XK, {round(X8_MK2_XK * 1024)}   | word moved per octave of t30 past it, T0 / 16, Q10",
+            f"        .equ    X8_XK, {round(X8_MK2_XK * 4096)}   | word moved per octave of t30 past it, T0 / 16, Q12",
+            f"        .equ    X8_XMAX, {X8_MK2_XMAX}   | largest move, word units (zero damping ~90 past stock, T59)",
             f"        .equ    X8_HOLD, {X8_MK2_HOLD}   | blocks from the note the 3 s cut is held off",
             f"        .equ    X8_HCNT, {X8_MK2_HCNT}   | stock's block count held there (< 4500)"]
 

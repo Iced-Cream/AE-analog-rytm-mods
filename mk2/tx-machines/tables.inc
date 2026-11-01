@@ -472,11 +472,12 @@ x9_sd:                       | TX-9 tom partial: (1 - decay per block) * 2^21, f
         .short  11240, 11063, 10892, 10739, 10590, 10445, 10304, 10246, 10189, 10133, 10091
 
         .equ    X8_ISAT, 103   | idx of DEC 0x7f00 (xt_dxt), 1/16 octave (--mk2-x8x)
-        .equ    X8_XK, 52   | word moved per octave of t30 past it, T0 / 16, Q10
+        .equ    X8_XK, 50   | word moved per octave of t30 past it, T0 / 16, Q12
+        .equ    X8_XMAX, 70   | largest move, word units (zero damping ~90 past stock, T59)
         .equ    X8_HOLD, 9000   | blocks from the note the 3 s cut is held off
         .equ    X8_HCNT, 4400   | stock's block count held there (< 4500)
 
-        .equ    S9F_K, 11082   | -11.0 dB re the body (--mk2-s9f)
+        .equ    S9F_K, 4412   | -19.0 dB re the body (--mk2-s9f)
 
         .align  2
 s9f_inc:                       | SD TX-9 fifth: phase step per sample, (TUN + DET) >> 9

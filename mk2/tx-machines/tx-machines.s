@@ -1000,14 +1000,17 @@ tx8xt_machine:
         | 191 Hz (unit, T58), against the TX-8's ~3 s. A smaller |damping| in
         | T0's direction rings longer (T0 < 0 on the unit: a smaller word), and
         | the word sits ~32,000 from the clamp (T57). So once stock has written
-        | it, x8_ext moves the word on in T0's direction by X8_XK (Q10) * T0 / 16
+        | it, x8_ext moves the word on in T0's direction by X8_XK (Q12) * T0 / 16
         | per octave of t30 that the DEC table asks for past stock's range
-        | (a5 = that excess in 1/16 octave, from tx8xt_machine).
+        | (a5 = that excess in 1/16 octave, from tx8xt_machine), at most X8_XMAX
+        | units: on the unit (T59) the damping reaches zero ~90-115 units past
+        | stock's longest word, and the voice self-oscillates beyond it.
         |
-        | X8_SWEEP (a test build, never released) instead moves it by 32 word
+        | X8_SWEEP (a test build, never released) instead moves it by 2 word
         | units per step of the TUN knob (fine tune off), at any DEC, so one
-        | unit run can map word against t30: TUN 0, 2, 4 .. 127 = 0, 64, 128
-        | .. 4064 units.
+        | unit run can map word against t30. 0.3's first sweep (32 units a step)
+        | self-oscillated from 512 units, so it is 2 a step: TUN 0..127 = 0..254
+        | units, the cap not applied.
         |
         | x8_hold: stock counts blocks since the note in the voice's state long
         | +0x10 and, past 4500 (3.0 s), adds (n - 4500) to the damping word every
@@ -1050,8 +1053,8 @@ x8_ext:
 2:      move.l  A_CTX+4(%sp),%a0
         add.l   %d1,%a0
         .if     X8_SWEEP
-        PARAM   8,%d0                             | TUN step * 32, in T0's direction
-        lsl.l   #5,%d0
+        PARAM   8,%d0                             | TUN step * 2, in T0's direction
+        add.l   %d0,%d0
         tst.l   (%a1)
         bge.s   3f
         neg.l   %d0
@@ -1064,8 +1067,16 @@ x8_ext:
         muls.l  %d1,%d0
         move.l  #X8_XK,%d1
         muls.l  %d1,%d0
-        moveq   #14,%d1                           | / 16 (octaves) / 1024 (Q10)
+        moveq   #16,%d1                           | / 16 (octaves) / 4096 (Q12)
         asr.l   %d1,%d0
+        move.l  #X8_XMAX,%d1                      | |move| <= X8_XMAX: zero damping
+        cmp.l   %d1,%d0                           | lies ~90 units past stock (T59)
+        ble.s   31f
+        move.l  %d1,%d0
+31:     neg.l   %d1
+        cmp.l   %d1,%d0
+        bge.s   3f
+        move.l  %d1,%d0
         .endif
 3:      move.w  (%a0),%d1
         ext.l   %d1

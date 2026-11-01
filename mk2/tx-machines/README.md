@@ -161,9 +161,33 @@ with no core change:
   -11 dB re the body's MD peak, decaying with the body (s9_fifth,
   --mk2-s9f). BAL stays 0x2000 and the analog osc 2 stays where it was.
 
-**0.3 status:** assembled only (binutils 2.42, ColdFire, release and sweep
-builds). Not yet linked, run in the emulator or on a unit; the level and
-decay of the fifth and X8_XK are first values for the unit to correct.
+**0.3 status.** Emulator (rytm-emu, 1 Nov 2026, build TX03 / TX3S): links
+with core-ar2 0.5 on stock 1.74, storage as 0.2. XT CLASSIC writes the
+damping word as a 16-bit store at ctx +0x7c / +0x80, and x8_ext moves it.
+The block count at state +0x10 holds at 4401 until 6 s. The fifth plays at
+276.2 Hz into stream 1 between SD CLASSIC and the noise. Every machine runs
+under the sequencer with no fault.
+
+**0.3, unit** (T59, 1 Nov 2026, TX3SH / TX03H = the first values +
+analoghealth, unit T0 -49974 LT / -50015 MT):
+
+- **The damping word is far more sensitive than stock's DEC term suggests.**
+  The sweep build (then 32 units a step) self-oscillated from 512 units at
+  every pitch. Zero damping lies only ~90-115 units past stock's longest
+  word. At the first X8_XK (0.0503) XT TX-8's DEC 127 rang ~17 s at 91 Hz
+  and self-oscillated at 141 / 191 Hz (stock's ramp still ended every note
+  after the 6 s hold).
+- **Refit:** X8_XK 12.5 / 1024 at X8_ISAT 103 (0.13 octave rms against the
+  takes), and the move is capped at X8_XMAX 70 units, so no setting can
+  reach zero damping. The sweep build now steps 2 units (0..254), to map
+  the slope and the zero point finely before release.
+- **SD TX-9's fifth** came out at the right pitch (276.1 Hz on a 191.9 Hz
+  body; the MD has 272.5 on 183.3) but -1.8 / -2.7 dB re the body at DEC
+  64 / 127, against the MD's -12.3 / -9.6 dB. S9F_DB is lowered from -11 to
+  -19. The MD's fifth also falls 1-4 dB faster than the body, which is left
+  for the next take.
+
+The refit is not yet on a unit.
 
 **0.1 (BD TX-9, SD TX-9):**
 
