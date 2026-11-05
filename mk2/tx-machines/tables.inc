@@ -9,7 +9,7 @@
         | tools/gen_tx_tables.py --mk2-bt8) and the XT TX-9 partial's X9S_K
         | (--mk2-x9s). 0.3 adds, at the end, XT TX-8's long-decay constants
         | (--mk2-x8x) and SD TX-9's fifth (--mk2-s9f), and retunes SD TX-9's
-        | t9sd_ptc to the MD on the MKII (--mk2-s9t).
+        | t9sd_ptc and TX8SD_TUNOFF to the MD on the MKII (--mk2-s9t).
 
         .text
 
@@ -214,7 +214,7 @@ n9_coef:                       | b0 b1 b2 a1 a2 a3, halved (y = 2 * sum), 48 kHz
         .long   0xb0ff389e, 0x1e6506d5
 
 
-        .equ    TX8SD_TUNOFF, 1854   | PTC 64 = 250 Hz on SD CLASSIC
+        .equ    TX8SD_TUNOFF, 1754   | PTC 64 = 250 Hz on the MKII's SD CLASSIC (--mk2-s9t)
 
         .align  2
 t8sd_body:                       | TX-8 SD: SD CLASSIC DEC for PTC (body T40 follows pitch)

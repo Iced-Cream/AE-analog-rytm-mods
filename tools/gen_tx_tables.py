@@ -156,6 +156,8 @@ S9F_DB = -19.0
 # 39 cents sharp of it (x1.439 on the unit); it now adds that offset, and S9F_RATIO_CENTS
 # more for the MD's measured fifth (x1.484, 1.478..1.488 over PTC, against DET's x1.4705
 # at DTU 64; no MD take at another DTU, so the trim is the same for every DTU).
+# SD TX-8 (pair check, 2026-11-05) sits +41..+43 cents over the MD at PTC 0 / 64 (127.9 /
+# 255.8 Hz against 124.8 / 249.6), the same SD CLASSIC offset: TX8SD_TUNOFF drops it.
 RYTM_SDCL_MK2_CENTS = 38.9
 TX9SD_MD_CENTS = {0: -33.6, 64: -40.2, 127: -37.4}      # MD body re 125 Hz (1 + p/128)
 S9F_RATIO_CENTS = 15.8
@@ -559,6 +561,12 @@ def s9_fifth() -> list[str]:
     return out
 
 
+def s8_tune() -> str:
+    """MKII 0.3: SD TX-8's TX8SD_TUNOFF with SD CLASSIC's MKII offset taken off (--mk2-s9t)."""
+    return (f"        .equ    TX8SD_TUNOFF, {int(round(tun_sd(250.0 * 2 ** (-RYTM_SDCL_MK2_CENTS / 1200))))}"
+            "   | PTC 64 = 250 Hz on the MKII's SD CLASSIC (--mk2-s9t)")
+
+
 def s9_tune() -> list[str]:
     """MKII 0.3: SD TX-9's body tuned to the MD (t9sd_ptc), less SD CLASSIC's MKII offset."""
     P = pts33()
@@ -808,6 +816,7 @@ def main():
         print("\n".join(s9_fifth()))
         return
     if "--mk2-s9t" in sys.argv:
+        print(s8_tune())
         print("\n".join(s9_tune()))
         return
     if "--mk2-bt8" in sys.argv:

@@ -219,7 +219,9 @@ the MD's x1.484. SD CLASSIC on the MKII sits a steady +39 cents over the
 tune model t9sd_ptc was built for, and the MD sits 34-40 cents under the
 formula itself. t9sd_ptc is refitted to the MD's pitches on the MKII, and
 the digital fifth adds SD CLASSIC's offset and 16 cents for the MD's ratio
-(tools/gen_tx_tables.py --mk2-s9t / --mk2-s9f). Not yet on a unit.
+(tools/gen_tx_tables.py --mk2-s9t / --mk2-s9f). SD TX-8 carries the same
+SD CLASSIC offset (+41..+43 cents over the MD at PTC 0 / 64), so its
+TX8SD_TUNOFF drops it too. Not yet on a unit.
 
 **0.1 (BD TX-9, SD TX-9):**
 
