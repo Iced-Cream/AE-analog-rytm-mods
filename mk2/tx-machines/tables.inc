@@ -8,7 +8,8 @@
         | b8_dec and b8_dq (the MKII's BT CLASSIC rings longer;
         | tools/gen_tx_tables.py --mk2-bt8) and the XT TX-9 partial's X9S_K
         | (--mk2-x9s). 0.3 adds, at the end, XT TX-8's long-decay constants
-        | (--mk2-x8x) and SD TX-9's fifth (--mk2-s9f).
+        | (--mk2-x8x) and SD TX-9's fifth (--mk2-s9f), and retunes SD TX-9's
+        | t9sd_ptc to the MD on the MKII (--mk2-s9t).
 
         .text
 
@@ -132,10 +133,10 @@ a8_wave:                       | TX-8 BD: attack waveform, 48 kHz, 8 bit of its 
         .equ    T9SD_BEND_DECAY, 0x65d65d17   | bend env per block
 
         .align  2
-t9sd_ptc:                       | TX-9 SD: SD CLASSIC tune re 0x3a00 for PTC (f1 = 125 Hz (1 + p/128))
-        .short  -1218, -1082, -950, -821, -696, -575, -457, -341, -229, -120, -13
-        .short  91, 193, 293, 390, 485, 579, 670, 760, 847, 934, 1018
-        .short  1101, 1182, 1262, 1340, 1418, 1493, 1568, 1641, 1713, 1784, 1854
+t9sd_ptc:                       | TX-9 SD: SD CLASSIC tune re 0x3a00 for PTC, the MD's pitch on the MKII (--mk2-s9t)
+        .short  -1404, -1268, -1137, -1010, -886, -766, -649, -534, -423, -315, -209
+        .short  -106, -5, 93, 190, 284, 376, 468, 558, 646, 733, 818
+        .short  901, 983, 1063, 1142, 1220, 1296, 1371, 1444, 1517, 1588, 1658
 
         .align  2
 t9sd_det:                       | TX-9 SD: DET for DTU (ratio from table 0x2ef; below unison clamped)
@@ -481,23 +482,23 @@ x9_sd:                       | TX-9 tom partial: (1 - decay per block) * 2^21, f
 
         .align  2
 s9f_inc:                       | SD TX-9 fifth: phase step per sample, (TUN + DET) >> 9
-        .long   0x0007e15e, 0x0008d86b, 0x0009edb9, 0x000b24fc
-        .long   0x000c825e, 0x000e0a89, 0x000fc2bb, 0x0011b0d5
-        .long   0x0013db71, 0x001649f9, 0x001904bc, 0x001c1513
-        .long   0x001f8576, 0x002361aa, 0x0027b6e3, 0x002c93f1
-        .long   0x00320979, 0x00382a25, 0x003f0aec, 0x0046c354
-        .long   0x004f6dc5, 0x005927e2, 0x006412f2, 0x0070544b
-        .long   0x007e15d9, 0x008d86a9, 0x009edb8a, 0x00b24fc5
-        .long   0x00c825e3, 0x00e0a896, 0x00fc2bb2, 0x011b0d51
-        .long   0x013db714, 0x01649f8a, 0x01904bc7, 0x01c1512c
-        .long   0x01f85764, 0x02361aa2, 0x027b6e28, 0x02c93f14
-        .long   0x0320978e, 0x0382a257, 0x03f0aec7, 0x046c3545
-        .long   0x04f6dc50, 0x05927e28, 0x06412f1c, 0x070544af
-        .long   0x07e15d8e, 0x08d86a89, 0x09edb8a0, 0x0b24fc4f
-        .long   0x0c825e38, 0x0e0a895e, 0x0fc2bb1c, 0x11b0d512
-        .long   0x13db7141, 0x1649f89e, 0x1904bc70, 0x1c1512bc
-        .long   0x1f857639, 0x2361aa25, 0x27b6e281, 0x2c93f13c
-        .long   0x320978df
+        .long   0x00082220, 0x0009211b, 0x000a3f50, 0x000b8091
+        .long   0x000ce92a, 0x000e7dec, 0x0010443f, 0x00124236
+        .long   0x00147e9f, 0x00170123, 0x0019d255, 0x001cfbd8
+        .long   0x0020887f, 0x0024846b, 0x0028fd3f, 0x002e0245
+        .long   0x0033a4a9, 0x0039f7b1, 0x004110fd, 0x004908d7
+        .long   0x0051fa7e, 0x005c048a, 0x00674953, 0x0073ef62
+        .long   0x008221fb, 0x009211ad, 0x00a3f4fc, 0x00b80915
+        .long   0x00ce92a5, 0x00e7dec3, 0x010443f5, 0x0124235b
+        .long   0x0147e9f8, 0x0170122a, 0x019d254b, 0x01cfbd87
+        .long   0x020887eb, 0x024846b6, 0x028fd3ef, 0x02e02453
+        .long   0x033a4a95, 0x039f7b0d, 0x04110fd6, 0x04908d6c
+        .long   0x051fa7df, 0x05c048a7, 0x0674952b, 0x073ef61b
+        .long   0x08221fab, 0x09211ad7, 0x0a3f4fbe, 0x0b80914d
+        .long   0x0ce92a55, 0x0e7dec35, 0x10443f57, 0x124235ae
+        .long   0x147e9f7c, 0x1701229b, 0x19d254ab, 0x1cfbd86a
+        .long   0x20887eae, 0x24846b5c, 0x28fd3ef7, 0x2e024536
+        .long   0x33a4a956
 
         .align  2
 s9f_dec:                       | SD TX-9 fifth: amplitude per block for DEC (the body's T40), Q31

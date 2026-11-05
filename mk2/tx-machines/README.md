@@ -181,8 +181,8 @@ analoghealth, unit T0 -49974 LT / -50015 MT):
   takes), and the move is capped at X8_XMAX 70 units, so no setting can
   reach zero damping. The sweep build now steps 2 units (0..254), to map
   the slope and the zero point finely before release.
-- **SD TX-9's fifth** came out at the right pitch (276.1 Hz on a 191.9 Hz
-  body; the MD has 272.5 on 183.3) but -1.8 / -2.7 dB re the body at DEC
+- **SD TX-9's fifth** came out at 276.1 Hz on a 191.9 Hz body (the MD has
+  272.5 on 183.3: the whole machine sits sharp, see the tuning below) and -1.8 / -2.7 dB re the body at DEC
   64 / 127, against the MD's -12.3 / -9.6 dB. S9F_DB is lowered from -11 to
   -19. The MD's fifth also falls 1-4 dB faster than the body, which is left
   for the next take.
@@ -205,6 +205,21 @@ used is 65 units, 28 under the lowest zero point measured. SD TX-9's fifth
 reads -9.8 / -10.7 dB re the body at DEC 64 / 127 (MD -12.3 / -9.6), at
 276 Hz on a 192 Hz body. Its decay is close to the MD's, which falls 2-4 dB
 faster at DEC 64. The constants stay as they are.
+
+**0.3 redo, unit** (T123, 5 Nov 2026, the same builds, through the Sidecar
+Pi in USB mirror mode) repeats T63 within 0.05-0.1 s and moves no constant.
+The "quiet first hits" an earlier take showed after a TYP change by CC are
+not real: the change gives a ~-57 dBFS blip before the note, which that
+analysis took for the hit.
+
+**SD TX-9 tuning (0.3).** Every SD TX-9 build up to here sits 72-79 cents
+sharp of the MD at PTC 0 / 64 / 127 (127.8 / 191.8 / 254.7 Hz against
+122.6 / 183.2 / 243.7), and its fifth runs at x1.439 of the body against
+the MD's x1.484. SD CLASSIC on the MKII sits a steady +39 cents over the
+tune model t9sd_ptc was built for, and the MD sits 34-40 cents under the
+formula itself. t9sd_ptc is refitted to the MD's pitches on the MKII, and
+the digital fifth adds SD CLASSIC's offset and 16 cents for the MD's ratio
+(tools/gen_tx_tables.py --mk2-s9t / --mk2-s9f). Not yet on a unit.
 
 **0.1 (BD TX-9, SD TX-9):**
 

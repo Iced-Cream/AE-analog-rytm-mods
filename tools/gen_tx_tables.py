@@ -146,6 +146,19 @@ X8_MK2_HOLD, X8_MK2_HCNT = 9000, 4400
 # the MD -12.3 / -9.6 dB: 7..10.5 dB hot, so -19. (The MD's fifth also falls 1-4 dB faster
 # than the body; left for the next unit take.)
 S9F_DB = -19.0
+# 0.3 (--mk2-s9t): SD TX-9's tuning. The A/B takes (T123, 2026-11-05; T63 and the 0.1 build
+# the same) put the MKII body 72..79 cents sharp of the MD at PTC 0 / 64 / 127 (127.8 /
+# 191.8 / 254.7 Hz against 122.6 / 183.2 / 243.7). Two parts: SD CLASSIC on the MKII sits
+# a steady +39 cents over the RYTM_SDCL_HZ0 model (38.4 / 39.3 / 39.0 against the f1 formula
+# t9sd_ptc is built for), and the MD itself sits 34..40 cents under that formula. t9sd_ptc
+# is refitted to the MD's pitches less the MKII's offset (cents linear between the points).
+# The digital fifth is played from the model, so it ran at the formula's ratio over a body
+# 39 cents sharp of it (x1.439 on the unit); it now adds that offset, and S9F_RATIO_CENTS
+# more for the MD's measured fifth (x1.484, 1.478..1.488 over PTC, against DET's x1.4705
+# at DTU 64; no MD take at another DTU, so the trim is the same for every DTU).
+RYTM_SDCL_MK2_CENTS = 38.9
+TX9SD_MD_CENTS = {0: -33.6, 64: -40.2, 127: -37.4}      # MD body re 125 Hz (1 + p/128)
+S9F_RATIO_CENTS = 15.8
 TX8_F64 = 49.7                       # the TX-8 BD at PTCH 64 (WAVS3: 49.4 .. 49.8 Hz)
 TX9_F64 = 56.0                       # the TX-9 BD at PTCH 64 (WAVS2/3 tails: 56.0 Hz)
 # BD TX-9 DIGI's decay: the emulator table, x the real MD's ratio to it (WAVS3: t30 80 /
@@ -536,13 +549,22 @@ def x8_mk2_ext() -> list[str]:
 def s9_fifth() -> list[str]:
     """MKII 0.3: SD TX-9's fifth, played digitally into stream 1 (s9_fifth)."""
     P = pts33()
-    inc = [round(RYTM_SDCL_HZ0 * 2 ** ((512 * i - 0x4000) / 3072) / 48000 * 2**32) for i in range(65)]
+    hz0 = RYTM_SDCL_HZ0 * 2 ** ((RYTM_SDCL_MK2_CENTS + S9F_RATIO_CENTS) / 1200)   # --mk2-s9t
+    inc = [round(hz0 * 2 ** ((512 * i - 0x4000) / 3072) / 48000 * 2**32) for i in range(65)]
     k = 10 ** (S9F_DB / 20) * max(TX9SD_PEAK.values()) * 65536
     out = [f"        .equ    S9F_K, {round(k)}   | {S9F_DB} dB re the body (--mk2-s9f)"]
     out += longs("s9f_inc", inc, "SD TX-9 fifth: phase step per sample, (TUN + DET) >> 9")
     out += longs("s9f_dec", [q31(10 ** (-40 / 20 * BLOCK_MS / at(TX9SD_BODY_T40, min(p, 127)))) for p in P],
                  "SD TX-9 fifth: amplitude per block for DEC (the body's T40), Q31")
     return out
+
+
+def s9_tune() -> list[str]:
+    """MKII 0.3: SD TX-9's body tuned to the MD (t9sd_ptc), less SD CLASSIC's MKII offset."""
+    P = pts33()
+    ptc = [tun_sd(125.0 * (1 + min(p, 128) / 128)
+                  * 2 ** ((at(TX9SD_MD_CENTS, min(p, 127)) - RYTM_SDCL_MK2_CENTS) / 1200)) for p in P]
+    return words("t9sd_ptc", ptc, "TX-9 SD: SD CLASSIC tune re 0x3a00 for PTC, the MD's pitch on the MKII (--mk2-s9t)")
 
 
 def bt_g(f: float, pts=None) -> float:
@@ -784,6 +806,9 @@ def main():
         return
     if "--mk2-s9f" in sys.argv:
         print("\n".join(s9_fifth()))
+        return
+    if "--mk2-s9t" in sys.argv:
+        print("\n".join(s9_tune()))
         return
     if "--mk2-bt8" in sys.argv:
         print("\n".join(bt8(mk2=True)))
