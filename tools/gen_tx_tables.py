@@ -120,6 +120,47 @@ BT_MK2_CORR = {0: 0.681, 16: 0.863, 75: 0.941}
 # rang 1.7-2.0x the model (975 / 1395 ms at BT DEC 15 / 27), at PTC 127 (99.4 Hz) 0.80-0.85x
 # (205 / 190 ms at BT DEC 85 / 73). G is scaled by this, log-linear in log f, 1 at 49.7 Hz.
 BT_MK2_GCORR = [(24.85, 2.0), (49.7, 1.0), (99.4, 0.82)]
+# 0.3 of the MKII port (mk2/tx-machines, --mk2-x8x): XT TX-8 past XT CLASSIC's longest DEC.
+# Above idx X8_ISAT (xt_dxt reaches DEC 0x7f00 at 16 (RYTM_XT_DEC_HI + 6)) the damping
+# word is moved X8_MK2_XK * T0 / 16 per octave of t30 still wanted. First value: stock's own
+# DEC term, which moves 0.0151 T0 (47 word units on the unit, T57) from DEC 0x4000 to 0x7f00
+# for 0.30 octave of t30 (RYTM_XT_DEC_HI's fit): 0.0503 per octave. A pitch octave moves the
+# word T0 / 16 for 1.75 octaves of t30, so the true slope may be far steeper; the word sweep
+# (X8_SWEEP build) decides, then X8_MK2_XK is refitted. The 3 s tail cut is held off for
+# X8_MK2_HOLD blocks (6 s), the stock block count held at X8_MK2_HCNT.
+# Unit, T59 (2026-11-01): the analog damping is far steeper than that. At X8_XK 0.0503 the
+# word moved -100 / -199 / -268 units at DEC 127 (LT 91, MT 141 / 191 Hz) and rang ~17 s or
+# self-oscillated; the X8_SWEEP build (32 units a step) self-oscillated from 512 units at
+# every pitch, zero damping lying ~90-115 units past stock's longest word. A fit of the
+# release takes gives 12.5 / 1024 at X8_ISAT 103, 0.13 octave rms; the move is also capped
+# at X8_MK2_XMAX units, under the ~90 of zero damping, so no setting can self-oscillate.
+X8_MK2_XK = 12.5 / 1024
+X8_MK2_XMAX = 70
+X8_MK2_HOLD, X8_MK2_HCNT = 9000, 4400
+# 0.3 (--mk2-s9f): SD TX-9's fifth. SD CLASSIC's osc 2 can't carry it (unit, T58: at BAL
+# 32 it sits -43 dB re the body, and the MD's -10..-12 dB needs BAL ~115, which takes ~20
+# dB off the body), so it is played digitally into stream 1 at osc 2's pitch (TUN + DET,
+# the bend included), S9F_DB re the body's MD peak, decaying with the body (T40 for DEC;
+# the MD takes may show otherwise, then this is refitted).
+# Unit, T59: at -11.0 the fifth read -1.8 / -2.7 dB re the body (DEC 64 / 127, 40-200 ms),
+# the MD -12.3 / -9.6 dB: 7..10.5 dB hot, so -19. (The MD's fifth also falls 1-4 dB faster
+# than the body; left for the next unit take.)
+S9F_DB = -19.0
+# 0.3 (--mk2-s9t): SD TX-9's tuning. The A/B takes (T123, 2026-11-05; T63 and the 0.1 build
+# the same) put the MKII body 72..79 cents sharp of the MD at PTC 0 / 64 / 127 (127.8 /
+# 191.8 / 254.7 Hz against 122.6 / 183.2 / 243.7). Two parts: SD CLASSIC on the MKII sits
+# a steady +39 cents over the RYTM_SDCL_HZ0 model (38.4 / 39.3 / 39.0 against the f1 formula
+# t9sd_ptc is built for), and the MD itself sits 34..40 cents under that formula. t9sd_ptc
+# is refitted to the MD's pitches less the MKII's offset (cents linear between the points).
+# The digital fifth is played from the model, so it ran at the formula's ratio over a body
+# 39 cents sharp of it (x1.439 on the unit); it now adds that offset, and S9F_RATIO_CENTS
+# more for the MD's measured fifth (x1.484, 1.478..1.488 over PTC, against DET's x1.4705
+# at DTU 64; no MD take at another DTU, so the trim is the same for every DTU).
+# SD TX-8 (pair check, 2026-11-05) sits +41..+43 cents over the MD at PTC 0 / 64 (127.9 /
+# 255.8 Hz against 124.8 / 249.6), the same SD CLASSIC offset: TX8SD_TUNOFF drops it.
+RYTM_SDCL_MK2_CENTS = 38.9
+TX9SD_MD_CENTS = {0: -33.6, 64: -40.2, 127: -37.4}      # MD body re 125 Hz (1 + p/128)
+S9F_RATIO_CENTS = 15.8
 TX8_F64 = 49.7                       # the TX-8 BD at PTCH 64 (WAVS3: 49.4 .. 49.8 Hz)
 TX9_F64 = 56.0                       # the TX-9 BD at PTCH 64 (WAVS2/3 tails: 56.0 Hz)
 # BD TX-9 DIGI's decay: the emulator table, x the real MD's ratio to it (WAVS3: t30 80 /
@@ -498,6 +539,42 @@ def x9_sub() -> list[str]:
     return out
 
 
+def x8_mk2_ext() -> list[str]:
+    """MKII 0.3: XT TX-8 past stock's DEC range (x8_hold, x8_ext in tx-machines.s)."""
+    return [f"        .equ    X8_ISAT, {round(16 * (RYTM_XT_DEC_HI + 6))}   | idx of DEC 0x7f00 (xt_dxt), 1/16 octave (--mk2-x8x)",
+            f"        .equ    X8_XK, {round(X8_MK2_XK * 4096)}   | word moved per octave of t30 past it, T0 / 16, Q12",
+            f"        .equ    X8_XMAX, {X8_MK2_XMAX}   | largest move, word units (zero damping ~90 past stock, T59)",
+            f"        .equ    X8_HOLD, {X8_MK2_HOLD}   | blocks from the note the 3 s cut is held off",
+            f"        .equ    X8_HCNT, {X8_MK2_HCNT}   | stock's block count held there (< 4500)"]
+
+
+def s9_fifth() -> list[str]:
+    """MKII 0.3: SD TX-9's fifth, played digitally into stream 1 (s9_fifth)."""
+    P = pts33()
+    hz0 = RYTM_SDCL_HZ0 * 2 ** ((RYTM_SDCL_MK2_CENTS + S9F_RATIO_CENTS) / 1200)   # --mk2-s9t
+    inc = [round(hz0 * 2 ** ((512 * i - 0x4000) / 3072) / 48000 * 2**32) for i in range(65)]
+    k = 10 ** (S9F_DB / 20) * max(TX9SD_PEAK.values()) * 65536
+    out = [f"        .equ    S9F_K, {round(k)}   | {S9F_DB} dB re the body (--mk2-s9f)"]
+    out += longs("s9f_inc", inc, "SD TX-9 fifth: phase step per sample, (TUN + DET) >> 9")
+    out += longs("s9f_dec", [q31(10 ** (-40 / 20 * BLOCK_MS / at(TX9SD_BODY_T40, min(p, 127)))) for p in P],
+                 "SD TX-9 fifth: amplitude per block for DEC (the body's T40), Q31")
+    return out
+
+
+def s8_tune() -> str:
+    """MKII 0.3: SD TX-8's TX8SD_TUNOFF with SD CLASSIC's MKII offset taken off (--mk2-s9t)."""
+    return (f"        .equ    TX8SD_TUNOFF, {int(round(tun_sd(250.0 * 2 ** (-RYTM_SDCL_MK2_CENTS / 1200))))}"
+            "   | PTC 64 = 250 Hz on the MKII's SD CLASSIC (--mk2-s9t)")
+
+
+def s9_tune() -> list[str]:
+    """MKII 0.3: SD TX-9's body tuned to the MD (t9sd_ptc), less SD CLASSIC's MKII offset."""
+    P = pts33()
+    ptc = [tun_sd(125.0 * (1 + min(p, 128) / 128)
+                  * 2 ** ((at(TX9SD_MD_CENTS, min(p, 127)) - RYTM_SDCL_MK2_CENTS) / 1200)) for p in P]
+    return words("t9sd_ptc", ptc, "TX-9 SD: SD CLASSIC tune re 0x3a00 for PTC, the MD's pitch on the MKII (--mk2-s9t)")
+
+
 def bt_g(f: float, pts=None) -> float:
     """BT CLASSIC t30 vs pitch at DEC 63 (log-log between the points, end slopes beyond)."""
     pts = pts or BT_T30_F
@@ -731,6 +808,16 @@ def main():
         k = X9S_A0 * 65536 * max(X9_PEAK.values()) / at(X9_PEAK, 96) * 10 ** (X9S_MK2_TRIM_DB / 20)
         print(f"        .equ    X9S_K, {round(k)}   | {X9S_MK2_TRIM_DB} dB on the MKII (--mk2-x9s)")
         print("\n".join(x9_sg()))
+        return
+    if "--mk2-x8x" in sys.argv:
+        print("\n".join(x8_mk2_ext()))
+        return
+    if "--mk2-s9f" in sys.argv:
+        print("\n".join(s9_fifth()))
+        return
+    if "--mk2-s9t" in sys.argv:
+        print(s8_tune())
+        print("\n".join(s9_tune()))
         return
     if "--mk2-bt8" in sys.argv:
         print("\n".join(bt8(mk2=True)))

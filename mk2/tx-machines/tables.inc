@@ -7,7 +7,9 @@
         | Two exceptions come from MKII recordings: BT TX-8's BT8_TUNOFF,
         | b8_dec and b8_dq (the MKII's BT CLASSIC rings longer;
         | tools/gen_tx_tables.py --mk2-bt8) and the XT TX-9 partial's X9S_K
-        | (--mk2-x9s).
+        | (--mk2-x9s). 0.3 adds, at the end, XT TX-8's long-decay constants
+        | (--mk2-x8x) and SD TX-9's fifth (--mk2-s9f), and retunes SD TX-9's
+        | t9sd_ptc and TX8SD_TUNOFF to the MD on the MKII (--mk2-s9t).
 
         .text
 
@@ -131,10 +133,10 @@ a8_wave:                       | TX-8 BD: attack waveform, 48 kHz, 8 bit of its 
         .equ    T9SD_BEND_DECAY, 0x65d65d17   | bend env per block
 
         .align  2
-t9sd_ptc:                       | TX-9 SD: SD CLASSIC tune re 0x3a00 for PTC (f1 = 125 Hz (1 + p/128))
-        .short  -1218, -1082, -950, -821, -696, -575, -457, -341, -229, -120, -13
-        .short  91, 193, 293, 390, 485, 579, 670, 760, 847, 934, 1018
-        .short  1101, 1182, 1262, 1340, 1418, 1493, 1568, 1641, 1713, 1784, 1854
+t9sd_ptc:                       | TX-9 SD: SD CLASSIC tune re 0x3a00 for PTC, the MD's pitch on the MKII (--mk2-s9t)
+        .short  -1404, -1268, -1137, -1010, -886, -766, -649, -534, -423, -315, -209
+        .short  -106, -5, 93, 190, 284, 376, 468, 558, 646, 733, 818
+        .short  901, 983, 1063, 1142, 1220, 1296, 1371, 1444, 1517, 1588, 1658
 
         .align  2
 t9sd_det:                       | TX-9 SD: DET for DTU (ratio from table 0x2ef; below unison clamped)
@@ -212,7 +214,7 @@ n9_coef:                       | b0 b1 b2 a1 a2 a3, halved (y = 2 * sum), 48 kHz
         .long   0xb0ff389e, 0x1e6506d5
 
 
-        .equ    TX8SD_TUNOFF, 1854   | PTC 64 = 250 Hz on SD CLASSIC
+        .equ    TX8SD_TUNOFF, 1754   | PTC 64 = 250 Hz on the MKII's SD CLASSIC (--mk2-s9t)
 
         .align  2
 t8sd_body:                       | TX-8 SD: SD CLASSIC DEC for PTC (body T40 follows pitch)
@@ -469,3 +471,43 @@ x9_sd:                       | TX-9 tom partial: (1 - decay per block) * 2^21, f
         .short  20509, 19550, 18677, 17878, 17145, 16547, 15989, 15468, 14980, 14510, 14068
         .short  13652, 13261, 12996, 12741, 12496, 12261, 12092, 11927, 11768, 11612, 11423
         .short  11240, 11063, 10892, 10739, 10590, 10445, 10304, 10246, 10189, 10133, 10091
+
+        .equ    X8_ISAT, 103   | idx of DEC 0x7f00 (xt_dxt), 1/16 octave (--mk2-x8x)
+        .equ    X8_XK, 50   | word moved per octave of t30 past it, T0 / 16, Q12
+        .equ    X8_XMAX, 70   | largest move, word units (zero damping ~90 past stock, T59)
+        .equ    X8_HOLD, 9000   | blocks from the note the 3 s cut is held off
+        .equ    X8_HCNT, 4400   | stock's block count held there (< 4500)
+
+        .equ    S9F_K, 4412   | -19.0 dB re the body (--mk2-s9f)
+
+        .align  2
+s9f_inc:                       | SD TX-9 fifth: phase step per sample, (TUN + DET) >> 9
+        .long   0x00082220, 0x0009211b, 0x000a3f50, 0x000b8091
+        .long   0x000ce92a, 0x000e7dec, 0x0010443f, 0x00124236
+        .long   0x00147e9f, 0x00170123, 0x0019d255, 0x001cfbd8
+        .long   0x0020887f, 0x0024846b, 0x0028fd3f, 0x002e0245
+        .long   0x0033a4a9, 0x0039f7b1, 0x004110fd, 0x004908d7
+        .long   0x0051fa7e, 0x005c048a, 0x00674953, 0x0073ef62
+        .long   0x008221fb, 0x009211ad, 0x00a3f4fc, 0x00b80915
+        .long   0x00ce92a5, 0x00e7dec3, 0x010443f5, 0x0124235b
+        .long   0x0147e9f8, 0x0170122a, 0x019d254b, 0x01cfbd87
+        .long   0x020887eb, 0x024846b6, 0x028fd3ef, 0x02e02453
+        .long   0x033a4a95, 0x039f7b0d, 0x04110fd6, 0x04908d6c
+        .long   0x051fa7df, 0x05c048a7, 0x0674952b, 0x073ef61b
+        .long   0x08221fab, 0x09211ad7, 0x0a3f4fbe, 0x0b80914d
+        .long   0x0ce92a55, 0x0e7dec35, 0x10443f57, 0x124235ae
+        .long   0x147e9f7c, 0x1701229b, 0x19d254ab, 0x1cfbd86a
+        .long   0x20887eae, 0x24846b5c, 0x28fd3ef7, 0x2e024536
+        .long   0x33a4a956
+
+        .align  2
+s9f_dec:                       | SD TX-9 fifth: amplitude per block for DEC (the body's T40), Q31
+        .long   0x75402144, 0x75f02c6f, 0x768b0ef9, 0x771461a0
+        .long   0x778ef7bc, 0x7830045e, 0x78babbd1, 0x793375e3
+        .long   0x799d7bb6, 0x7a4efe58, 0x7addbaee, 0x7b52ffa3
+        .long   0x7bb50e60, 0x7c14eca2, 0x7c6568c3, 0x7ca9f034
+        .long   0x7ce4fdc0, 0x7d25e5a9, 0x7d5d0157, 0x7d8c60db
+        .long   0x7db589c4, 0x7de3f8c9, 0x7e0b979b, 0x7e2dcbe1
+        .long   0x7e4b9fba, 0x7e726cfb, 0x7e92e400, 0x7eae7430
+        .long   0x7ec625c7, 0x7ee18d75, 0x7ef88e56, 0x7f0c23b5
+        .long   0x7f19046e
