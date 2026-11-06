@@ -1,14 +1,15 @@
         | fx-sends - FX SENDS (AE 0010), a chorus as one more send effect, on a
         | second AMP page, for the Analog Rytm MKII, OS 1.74.
         |
-        | Press AMP a second time for the FX SENDS page:
+        | Press AMP a second time on a drum track for the SEND page:
         |   CHR  chorus send   (per track, saved with the sound)
+        | and on the FX track, DELAY a second time for the CHORUS page:
         |   PRE  pre-delay, 1 .. 20 ms                     \
-        |   SPD  speed, 0.05 .. 8 Hz                        |  global, shared by every
-        |   DEP  depth, 0 .. 8 ms of sweep                  |  track's page, held in
-        |   WID  stereo width: 0 mono, 127 the two taps     |  RAM: back to their
-        |        sweeping in opposite phase                 |  defaults at power-up,
-        |   FDB  feedback, 0 .. 0.89                        |  as on the MK1
+        |   SPD  speed, 0.05 .. 8 Hz                        |  the FX track's
+        |   DEP  depth, 0 .. 8 ms of sweep                  |  parameters (1.1):
+        |   WID  stereo width: 0 mono, 127 the two taps     |  saved with the kit,
+        |        sweeping in opposite phase                 |  lockable, FX LFO
+        |   FDB  feedback, 0 .. 0.89                        |  destinations
         |   HPF  high-pass on the chorus input, off .. ~2 kHz
         |   VOL  the return's level                        /
         |
@@ -32,9 +33,27 @@
         |
         | Storage: CHR is a 7-bit sound field in core-ar2 0.3's mod storage
         | (fx_sends_chr), so it travels with the sound and the sound's stock bytes
-        | stay stock. The MK1 kept it in the sound's free parameter word. The
-        | audio interrupt never calls core: the UI tick copies each track's CHR
-        | into chr_trk, and an edit updates its track's entry at once.
+        | stay stock. The MK1 kept it in the sound's free parameter word.
+        |
+        | The chorus settings (1.1, core-ar2 0.10) are 7-bit kit fields
+        | (fx_sends_pre .. fx_sends_vol, with the MK1's defaults as their inits),
+        | lockable and FX LFO destinations: the FX track's parameters, p-locked
+        | with an FX trig held, locked in scenes and performances, on MIDI on the
+        | FX channel. While the chorus runs, the audio reads all seven as stock
+        | would play them (core_param_values on track 12) every block into
+        | globals, which the chorus and the return read as before.
+        |
+        | Locks (1.1, core-ar2 0.10): CHR is a lockable parameter (core_lock_params):
+        | p-locked with a trig held, locked in scenes, given performance depths,
+        | on MIDI as NRPN 4 / its code - 42, an LFO destination (AMP:Chorus Send
+        | in DST) and a velocity and aftertouch destination, as a stock
+        | parameter. The audio reads the value stock would play
+        | (core_param_value_h: the sound's CHR, the trig's p-lock, the scene's
+        | lock, smoothed as stock smooths, plus the performances, the velocity
+        | and aftertouch routes and the LFO), one
+        | voice's track a block in turn, so each voice's entry in chr_trk is at
+        | most 8 blocks (5 ms) old, as often as coefs_build reads it; an edit
+        | updates its track's entry at once.
         |
         | The page: page 15 after AMP (page 7) in the AMP view's list, through
         | core-ar2 0.4's page tables. Its knobs are CY TEST's parameter records 449..456 (a hidden
@@ -45,7 +64,9 @@
         | Cost: nothing while no track sends and the tail has died (~3 s).
 
         .equ    PAGE_AMP,       7
-        .equ    PAGE_FX,        15
+        .equ    PAGE_FX,        15                | SEND: CHR
+        .equ    PAGE_CHO,       16                | CHORUS: PRE .. VOL
+        .equ    CHORUS_VIEW,    5                 | CORE_VIEW_DELAY: DELAY pressed again
         .equ    ID0,            449               | CHR PRE SPD DEP WID FDB HPF VOL: 449..456
         .equ    KNOBS,          8
 
@@ -109,6 +130,14 @@
         .equ    SOUND_CONFIG_CHANGED, 0x401cb88c  | SoundConfigChangedInfo's vtable
 
         .extern core_store_get, core_store_set, fx_sends_chr
+        .extern core_param_handle, core_param_value_h, core_param_values
+        .extern fx_sends_pre, fx_sends_spd, fx_sends_dep, fx_sends_wid
+        .extern fx_sends_fdb, fx_sends_hpf, fx_sends_vol
+        .equ    FX_TRACK,       12
+        .equ    LIVE_KITS,      0x412558e3        | the kits as edited
+        .equ    LIVE_KIT_SIZE,  2531
+        .equ    WORKING_KIT,    0x405c8f20+0x19d3f7 | the working kit's index, a long, unaligned
+        .equ    PARAM_NONE,     0x80000000        | CORE_PARAM_NONE
 
         .text
 
@@ -131,6 +160,8 @@ fx_sends_fx_gate:
         movem.l %d2-%d7/%a2-%a6,(%sp)
         move.l  %macsr,%d0
         move.l  %d0,44(%sp)
+        bsr.w   chr_read                          | core's C, before the MAC mode changes
+        bsr.w   cho_read
         move.l  #0xa0,%macsr                      | as the stock FX: fractional, saturating
         lea     st,%a6
 
@@ -229,6 +260,117 @@ fx_sends_ret_gate:
         movem.l (%sp),%d2-%d6/%a2
         lea     28(%sp),%sp
         rts
+
+        | ------------------------------------------------------------------
+        | chr_read() - one voice a block, in turn: its owning track's CHR as
+        | stock would play it (the sound's, the trig's p-lock, the scene's lock,
+        | smoothed, plus the performances, the routes and the LFO;
+        | core_param_value_h, 8.8) into
+        | chr_trk, rounded to 0..127. The handle is looked up on the first call.
+        | C convention; clobbers d0/d1/a0/a1.
+        | ------------------------------------------------------------------
+        .align  2
+chr_read:
+        lea     chr_h,%a0
+        move.l  (%a0),%d0
+        bne.s   1f
+        move.l  #fx_sends_chr,-(%sp)
+        jsr     core_param_handle
+        addq.l  #4,%sp
+        lea     chr_h,%a0
+        move.l  %d0,(%a0)
+        beq.s   9f                                | no lock code: chr_trk from the tick
+1:      move.l  %d2,-(%sp)
+        lea     chr_rr,%a0
+        mvz.b   (%a0),%d1
+        addq.l  #1,%d1
+        moveq   #VOICES-1,%d2
+        and.l   %d1,%d2
+        move.b  %d2,(%a0)
+        lea     VOICE_OWNER,%a0
+        mvz.b   (%a0,%d2.l),%d2                   | d2 = the voice's track
+        moveq   #TRACKS-1,%d1
+        cmp.l   %d1,%d2
+        bhi.s   8f
+        clr.l   -(%sp)                            | flags
+        move.l  chr_h,-(%sp)                      | handle
+        move.l  %d2,-(%sp)                        | track
+        jsr     core_param_value_h
+        lea     12(%sp),%sp
+        cmp.l   #PARAM_NONE,%d0
+        beq.s   8f
+        add.l   #128,%d0                          | rounded to whole steps
+        asr.l   #8,%d0
+        bpl.s   2f
+        moveq   #0,%d0
+2:      moveq   #127,%d1
+        cmp.l   %d1,%d0
+        ble.s   3f
+        move.l  %d1,%d0
+3:      lea     chr_trk,%a0
+        move.b  %d0,(%a0,%d2.l)
+8:      move.l  (%sp)+,%d2
+9:      rts
+
+        | ------------------------------------------------------------------
+        | cho_read() - while the chorus runs (a track sends, or its tail),
+        | the seven settings as stock would play them on the FX track (the
+        | kit's, the FX trig's p-lock, the scene's lock, smoothed, plus the
+        | performances and the FX LFO; core_param_values, 8.8) into globals,
+        | rounded to 0..127. Handles on the first call. C convention;
+        | clobbers d0/d1/a0/a1.
+        | ------------------------------------------------------------------
+        .align  2
+cho_read:
+        lea     st,%a0
+        tst.l   ST_ANY(%a0)
+        bne.s   1f
+        tst.l   ST_TAIL(%a0)
+        beq.w   9f                                | idle: nothing reads them
+1:      lea     cho_h,%a0
+        tst.l   (%a0)
+        bne.s   3f
+        move.l  %d2,-(%sp)
+        moveq   #0,%d2
+2:      lea     cho_fields,%a0
+        move.l  (%a0,%d2.l*4),-(%sp)
+        jsr     core_param_handle
+        addq.l  #4,%sp
+        lea     cho_h,%a0
+        move.l  %d0,(%a0,%d2.l*4)
+        addq.l  #1,%d2
+        moveq   #KNOBS-1,%d0
+        cmp.l   %d0,%d2
+        bne.s   2b
+        move.l  (%sp)+,%d2
+        lea     cho_h,%a0
+        tst.l   (%a0)
+        beq.w   9f                                | no codes: the chorus keeps its last
+3:      pea     cho_out
+        clr.l   -(%sp)                            | flags
+        pea     KNOBS-1                           | n
+        pea     cho_h
+        pea     FX_TRACK
+        jsr     core_param_values
+        lea     20(%sp),%sp
+        lea     cho_out,%a0
+        lea     globals,%a1
+        moveq   #KNOBS-1,%d1
+4:      move.l  (%a0)+,%d0
+        cmp.l   #PARAM_NONE,%d0
+        beq.s   6f
+        add.l   #128,%d0
+        asr.l   #8,%d0
+        bpl.s   5f
+        moveq   #0,%d0
+5:      cmp.l   #127,%d0
+        ble.s   7f
+        moveq   #127,%d0
+7:      move.b  %d0,(%a1)
+6:      addq.l  #1,%a1
+        subq.l  #1,%d1
+        bne.s   4b
+9:      rts
 
         | ------------------------------------------------------------------
         | coefs_build(a6 = st) -> d0 non-zero if any track sends. Per physical
@@ -531,24 +673,58 @@ knob_of:
 2:      tst.l   %d0
         rts
 
+        | cur_kit() -> d0 = the working kit as edited (the FX track's item), or
+        | 0. Clobbers d0/d1/a0.
+        .align  2
+cur_kit:
+        lea     WORKING_KIT,%a0
+        moveq   #4,%d1
+        moveq   #0,%d0
+1:      lsl.l   #8,%d0
+        move.b  (%a0)+,%d0
+        subq.l  #1,%d1
+        bne.s   1b
+        cmp.l   #128,%d0
+        bcc.s   8f
+        move.l  #LIVE_KIT_SIZE,%d1
+        mulu.l  %d1,%d0
+        add.l   #LIVE_KITS,%d0
+        rts
+8:      moveq   #0,%d0
+        rts
+
+        | kit_get(d0 = knob 1..7) -> d0 = its field in the working kit, 0..127
+        | (0 with no kit). Clobbers d0/d1/a0/a1.
+        .align  2
+kit_get:
+        move.l  %d0,-(%sp)
+        bsr.w   cur_kit
+        move.l  (%sp)+,%d1
+        tst.l   %d0
+        beq.s   9f
+        clr.l   -(%sp)                            | index, unused for a kit
+        move.l  %d0,-(%sp)                        | item: the kit
+        lea     cho_fields-4,%a0
+        move.l  (%a0,%d1.l*4),-(%sp)              | the field's descriptor
+        jsr     core_store_get
+        lea     12(%sp),%sp
+9:      rts
+
         | value_of(d0 = knob) -> d0 = 0..127: CHR from the selected track's
-        | sound, the rest from RAM. Clobbers d0/d1/a0/a1.
+        | sound, the rest from the working kit. Clobbers d0/d1/a0/a1.
         .align  2
 value_of:
         tst.l   %d0
-        beq.s   1f
-        lea     globals-1,%a0
-        mvz.b   (%a0,%d0.l),%d0
-        rts
-1:      bsr.s   sel_track
+        bne.w   kit_get
+        bsr.w   sel_track
         moveq   #TRACKS-1,%d1
         cmp.l   %d1,%d0
         bhi.s   8f
         bsr.w   accessor_of
-        bsr.s   live_of
+        bsr.w   live_of
         tst.l   %d0
         beq.s   8f
-        bra.s   chr_of
+        bra.w   chr_of
 8:      moveq   #0,%d0
         rts
 
@@ -556,9 +732,9 @@ value_of:
         .align  2
 fs_get:
         move.l  4(%sp),%d0
-        bsr.s   knob_of
+        bsr.w   knob_of
         bmi.s   9f
-        bsr.s   value_of
+        bsr.w   value_of
         lsl.l   #8,%d0
         move.l  8(%sp),%a0
         move.l  %d0,(%a0)
@@ -568,26 +744,49 @@ fs_get:
         rts
 
         | int delta(void *view, long id, long delta, long func): the delta in 8.8, added
-        | to the knob's 8.8 value, whose whole part is the setting. The globals
-        | keep their fractions in acc; CHR keeps one fraction, for the track it
-        | was last turned on.
+        | to the knob's 8.8 value, whose whole part is the setting. The chorus
+        | settings keep their fractions in acc while the kit holds acc's whole
+        | part; CHR keeps one fraction, for the track it was last turned on.
         .align  2
 fs_delta:
         move.l  8(%sp),%d0
-        bsr.s   knob_of
+        bsr.w   knob_of
         bmi.w   8f
         tst.l   %d0
-        beq.s   20f
-        move.l  %d0,%a1                           | a global
+        beq.w   20f
+        lea     -12(%sp),%sp                      | a kit field
+        movem.l %d2-%d4,(%sp)
+        move.l  %d0,%d2                           | d2 = the knob
+        bsr.w   cur_kit
+        move.l  %d0,%d3                           | d3 = the kit
+        beq.s   17f
+        move.l  %d2,%d0
+        bsr.w   kit_get
+        move.l  %d0,%d4                           | d4 = the stored setting
+        lsl.l   #8,%d0
         lea     acc,%a0
-        mvz.w   (%a0,%d0.l*2),%d0
-        add.l   12(%sp),%d0
+        mvz.w   (%a0,%d2.l*2),%d1
+        move.l  %d1,%a1
+        lsr.l   #8,%d1
+        cmp.l   %d4,%d1                           | acc still on the stored step:
+        bne.s   11f
+        move.l  %a1,%d0                           | keep its fraction
+11:     add.l   24(%sp),%d0                       | the delta
         bsr.w   clamp
         lea     acc,%a0
-        move.w  %d0,(%a0,%a1.l*2)
+        move.w  %d0,(%a0,%d2.l*2)
         lsr.l   #8,%d0
-        lea     globals-1,%a0
-        move.b  %d0,(%a0,%a1.l)
+        cmp.l   %d4,%d0
+        beq.s   17f
+        move.l  %d0,-(%sp)                        | value
+        clr.l   -(%sp)                            | index
+        move.l  %d3,-(%sp)                        | item: the kit
+        lea     cho_fields-4,%a0
+        move.l  (%a0,%d2.l*4),-(%sp)
+        jsr     core_store_set
+        lea     16(%sp),%sp
+17:     movem.l (%sp),%d2-%d4
+        lea     12(%sp),%sp
         moveq   #1,%d0
         rts
 
@@ -659,44 +858,12 @@ clamp:
         move.l  %d1,%d0
 2:      rts
 
-        | int text(struct core_text *t): plain 0..127; t = {obj, id, value, buf}
+        | int text(struct core_text *t): passes. All eight are lockable
+        | parameters, whose value text core writes as a number (a held trig's
+        | lock, a scene's), as 1.0 wrote it from the setting.
         .align  2
 fs_text:
-        move.l  4(%sp),%a1
-        move.l  4(%a1),%d0                        | the id
-        bsr.w   knob_of
-        bmi.s   8f
-        bsr.w   value_of
-        move.l  4(%sp),%a1
-        move.l  12(%a1),%a1                       | the buffer
-        bsr.s   put_u3
-        clr.b   (%a1)
-        moveq   #1,%d0
-        rts
-8:      moveq   #0,%d0
-        rts
-
-        | put_u3(d0 = 0..127, a1 = out) - decimal, no leading zeros, a1 past it.
-        | Clobbers d0.
-put_u3:
-        move.l  %d1,-(%sp)
-        moveq   #100,%d1
-        cmp.l   %d1,%d0
-        bcs.s   1f
-        sub.l   %d1,%d0
-        move.b  #0x31,(%a1)+                      | at most 127: the hundreds are 1
-        divu.w  #10,%d0
-        bra.s   2f
-1:      divu.w  #10,%d0
-        tst.w   %d0
-        beq.s   3f
-2:      move.l  %d0,%d1
-        add.l   #0x30,%d1
-        move.b  %d1,(%a1)+
-3:      swap    %d0
-        add.l   #0x30,%d0
-        move.b  %d0,(%a1)+
-        move.l  (%sp)+,%d1
+        moveq   #0,%d0
         rts
 
         | ==================================================================
@@ -706,7 +873,8 @@ put_u3:
         | ev_tick: once, the eight knobs' RAM records (built at boot from the
         | records patched in mod.json) take a stock dial's encoder feel and
         | its dial art, from COMP's MIX (id 94, 0..127). Every tick, each
-        | track's CHR into chr_trk, which the audio reads.
+        | track's CHR into chr_trk, which the audio reads, only while CHR has
+        | no handle (chr_read reads it otherwise).
         .equ    PARAM_INFO,     0x419a4888        | RAM records, 0x54 bytes an id
         .equ    PI_STRIDE,      0x54
         .equ    PI_DRAW,        0x24              | the draw callback, 16 B
@@ -732,7 +900,9 @@ fx_sends_tick:
         lea     PI_STRIDE(%a1),%a1
         subq.l  #1,%d0
         bne.s   1b
-5:      move.l  %d2,-(%sp)
+5:      tst.l   chr_h                             | the audio reads CHR itself
+        bne.s   9f
+        move.l  %d2,-(%sp)
         moveq   #0,%d2
 6:      move.l  %d2,%d0
         bsr.w   accessor_of
@@ -747,7 +917,7 @@ fx_sends_tick:
         cmp.l   %d0,%d2
         bne.s   6b
         move.l  (%sp)+,%d2
-        rts
+9:      rts
 
         | ev_project(how, dropped): a project was loaded or made: the audio's
         | copies go to 0 until the next tick reads the new kit's sounds
@@ -766,14 +936,48 @@ fx_sends_project:
         .align  4
         .globl  fx_sends_view_page
 fx_sends_view_page: .long 3, PAGE_FX, 0           | core_view_pages: CORE_VIEW_AMP, always shown
-        .globl  fx_sends_page, fx_sends_params
+        .globl  fx_sends_view_cho
+fx_sends_view_cho: .long CHORUS_VIEW, PAGE_CHO, 0  | core_view_pages: the FX track's
+        .globl  fx_sends_page, fx_sends_page_cho, fx_sends_params
 fx_sends_page:  .long   PAGE_FX, str_page         | core_pages: {page, name, A..D, E..H}
-                .long   ID0, ID0+1, ID0+2, ID0+3
-                .long   ID0+4, ID0+5, ID0+6, ID0+7
+                .long   ID0, 0, 0, 0
+                .long   0, 0, 0, 0
+fx_sends_page_cho: .long PAGE_CHO, str_page_cho
+                .long   ID0+1, ID0+2, ID0+3, ID0+4
+                .long   ID0+5, ID0+6, ID0+7, 0
 fx_sends_params: .long  ID0, ID0+KNOBS-1, fs_get, fs_delta, fs_text  | core_params
-acc:            .short  0, 40<<8, 24<<8, 64<<8, 96<<8, 0, 0, 100<<8  | the globals in 8.8
-globals:        .byte   40, 24, 64, 96, 0, 0, 100 | PRE SPD DEP WID FDB HPF VOL (defaults)
+acc:            .short  0, 40<<8, 24<<8, 64<<8, 96<<8, 0, 0, 100<<8  | the turns' fractions, 8.8
+globals:        .byte   40, 24, 64, 96, 0, 0, 100 | PRE SPD DEP WID FDB HPF VOL: the audio's copy
 ready:          .byte   0
+chr_rr:         .byte   VOICES-1                  | chr_read's last voice
+        .align  2
+        .globl  fx_sends_chr_param
+fx_sends_chr_param:                               | core_lock_params: struct core_lock_param
+                .long   fx_sends_chr, ID0         | field, the page knob's id
+                .short  0, 127                    | min, max
+                .long   fx_sends_str_chr, fx_sends_str_chr_l, str_cat
+chr_h:          .long   0                         | CHR's handle (core_param_handle)
+        | the chorus settings' fields (knobs 1..7), their lock parameters and
+        | their handles
+cho_fields:     .long   fx_sends_pre, fx_sends_spd, fx_sends_dep, fx_sends_wid
+                .long   fx_sends_fdb, fx_sends_hpf, fx_sends_vol
+        .globl  fx_sends_pre_param, fx_sends_spd_param, fx_sends_dep_param, fx_sends_wid_param
+        .globl  fx_sends_fdb_param, fx_sends_hpf_param, fx_sends_vol_param
+        .macro  CHO_PARAM name, field, k
+fx_sends_\name\()_param:
+                .long   \field, ID0+\k
+                .short  0, 127
+                .long   fx_sends_str_\name, fx_sends_str_\name\()_l, str_cat_cho
+        .endm
+        CHO_PARAM pre, fx_sends_pre, 1
+        CHO_PARAM spd, fx_sends_spd, 2
+        CHO_PARAM dep, fx_sends_dep, 3
+        CHO_PARAM wid, fx_sends_wid, 4
+        CHO_PARAM fdb, fx_sends_fdb, 5
+        CHO_PARAM hpf, fx_sends_hpf, 6
+        CHO_PARAM vol, fx_sends_vol, 7
+cho_h:          .space  (KNOBS-1)*4               | their handles
+cho_out:        .space  (KNOBS-1)*4               | core_param_values' answers
 chr_frac:       .byte   0, 0xff                   | CHR's fraction, and its track
         | physical voice -> its receive-buffer offset, +8 + 4 * slot, from the
         | stock map 0x401ef480 (0, 3, 1, 4, 6, 5, 7, 2)
@@ -783,6 +987,9 @@ slot_off:       .byte   8, 20, 12, 24, 32, 28, 36, 16
         .globl  fx_sends_str_wid_l, fx_sends_str_fdb_l, fx_sends_str_hpf_l, fx_sends_str_vol_l
         .globl  fx_sends_str_chr, fx_sends_str_pre, fx_sends_str_spd, fx_sends_str_dep
         .globl  fx_sends_str_wid, fx_sends_str_fdb, fx_sends_str_hpf, fx_sends_str_vol
+str_cat:        .asciz  "AMP"                     | AMP:Chorus Send, as AMP:Reverb Send
+str_cat_cho:    .asciz  "CHO"                     | CHO:Chorus Speed, as DEL:, REV:
+str_page_cho:   .asciz  "CHOR"
 str_page:       .asciz  "SEND"                    | the page title shows 4 characters
 fx_sends_str_group: .asciz "FX SENDS"
 fx_sends_str_chr_l: .asciz "Chorus Send"

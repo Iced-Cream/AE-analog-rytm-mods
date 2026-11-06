@@ -3,22 +3,27 @@
 FX SENDS, AE 0010, ported to the MKII as an elemod: a chorus as one more send
 effect, with the Analog Four chorus's controls.
 
-On a voice track, press AMP a second time for the FX SENDS page:
+1.1 (core-ar2 0.10). On a drum track, press AMP a second time for the SEND
+page; on the FX track, press DELAY a second time for the CHORUS page:
 
-| knob | range | what | kept |
-|---|---|---|---|
-| CHR | 0..127 | the track's send to the chorus | per sound, with the sound |
-| PRE | 0..127 | pre-delay, 1 to 20 ms | global, RAM |
-| SPD | 0..127 | LFO speed, 0.05 to 8 Hz | global, RAM |
-| DEP | 0..127 | sweep depth, 0 to 8 ms | global, RAM |
-| WID | 0..127 | stereo width: 0 mono, 127 the taps in opposite phase | global, RAM |
-| FDB | 0..127 | feedback, 0 to 0.89 | global, RAM |
-| HPF | 0..127 | one-pole high-pass on the chorus input, off to about 2 kHz | global, RAM |
-| VOL | 0..127 | the return's level | global, RAM |
+| page | knob | range | what | kept | locks, modulation |
+|---|---|---|---|---|---|
+| SEND | CHR | 0..127 | the track's send to the chorus | per sound | p-lock, scene, performance, LFO, velocity, aftertouch |
+| CHORUS | PRE | 0..127 | pre-delay, 1 to 20 ms | per kit | p-lock (FX trig), scene, performance, FX LFO |
+| CHORUS | SPD | 0..127 | LFO speed, 0.05 to 8 Hz | per kit | as PRE |
+| CHORUS | DEP | 0..127 | sweep depth, 0 to 8 ms | per kit | as PRE |
+| CHORUS | WID | 0..127 | stereo width: 0 mono, 127 the taps in opposite phase | per kit | as PRE |
+| CHORUS | FDB | 0..127 | feedback, 0 to 0.89 | per kit | as PRE |
+| CHORUS | HPF | 0..127 | one-pole high-pass on the chorus input, off to about 2 kHz | per kit | as PRE |
+| CHORUS | VOL | 0..127 | the return's level | per kit | as PRE |
 
-The seven global settings are shared by every track's page and go back to
-their defaults (PRE 40, SPD 24, DEP 64, WID 96, FDB 0, HPF 0, VOL 100) at
-power-up, as on the MK1.
+All eight are core-ar2 lockable parameters, each with an NRPN (MSB 4) and a CC
+from core's pool: CHR on the track's channel, the chorus settings on the FX
+track's. In the LFO menus they read AMP:Chorus Send and CHO:Chorus Speed and
+so on. A new kit, or one saved without fx-sends, starts the chorus settings at
+the MK1's defaults (PRE 40, SPD 24, DEP 64, WID 96, FDB 0, HPF 0, VOL 100,
+field inits). In 1.0 they were global, held in RAM, and went back to those
+defaults at power-up.
 
 The chorus is the MK1's code: two linearly interpolated taps on one 2048-sample
 line, each swept by a triangle LFO, the input high-passed, the taps' average
@@ -43,32 +48,51 @@ the tail has died (about 3 s).
   voice-dac's notes, **not checked on hardware for this mod**.
 - **CHR storage.** The MK1 kept CHR in the sound's free parameter word. Here
   it is a 7-bit sound field in core-ar2's mod storage (`fx_sends_chr`),
-  so it travels with the sound and the sound's stock bytes stay stock. The
-  audio interrupt never calls core: the UI tick (20 Hz) copies each track's CHR
-  into a table the interrupt reads, and an edit updates its track at once. Each
+  so it travels with the sound and the sound's stock bytes stay stock. Each
   edit sends stock's sound change notice, as lfo-rnd and voice-dac do, so it is
   kept without a kit save.
+- **Chorus storage (1.1).** Seven 7-bit kit fields (`fx_sends_pre` ..
+  `fx_sends_vol`) in core-ar2's kit storage, with `init` values so a kit
+  without them reads the defaults.
+- **The values the audio uses (1.1).** CHR is read as stock would play it
+  (`core_param_value_h`: the sound's value, the trig's p-lock, the scene's
+  lock, smoothed with stock's one-pole, plus the performances, the routes and
+  the LFO), one voice's track a block in turn, so each voice's send is at most
+  8 blocks (5 ms) old, as often as the send coefficients were rebuilt in 1.0;
+  they still glide a quarter of the way a rebuild. While the chorus runs (a
+  track sends, or its 3 s tail), the seven settings are read on the FX track
+  every block in one `core_param_values` call. Both reads run before the audio
+  switches the MAC to fractional mode. 1.0's UI tick copy of CHR is kept only
+  for a core that gives CHR no lock code.
 - **Memory.** The line and buffers (8.5 KB) are this mod's `.bss`, not raw
   DRAM, so there is no clearing pass after boot.
 - **Knobs.** The hidden CY TEST machine's parameter records 449..456, renamed.
   At the first UI tick their RAM records take the dial art and encoder feel of
-  COMP's MIX knob (as duck does). The global settings keep 8.8 fractions; CHR
-  keeps one fraction, for the track it was last turned on.
-- **Page.** Page 15, after AMP (page 7) in the AMP view's list, through
-  core-ar2 0.4's page tables (`core_pages`, `core_params`) and page-key lists
-  (`core_view_pages`, order 30).
+  COMP's MIX knob (as duck does). The chorus settings keep the turn's 8.8
+  fraction while the kit holds its whole step; CHR keeps one fraction, for the
+  track it was last turned on. The value text is core's (the number, a held
+  trig's lock), so it is no longer drawn by the mod.
+- **Pages.** SEND, page 15, after AMP (page 7) in the AMP view's list, with
+  CHR on knob A; CHORUS, page 16, after DELAY (page 8) in the DELAY view's
+  list, PRE..VOL on knobs A..G; through core-ar2's page tables (`core_pages`,
+  `core_params`) and page-key lists (`core_view_pages`, order 30). 1.0 had all
+  eight on one page behind AMP.
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.4 (its page tables).
-- Uses 7 bits of core-ar2's 56-bit sound storage. voice-dac 1.4 (39) and
-  lfo-rnd 1.2 (16) use 55; voice-dac 1.5 (32), lfo-rnd 1.3 (16) and core
-  0.10's LFO destination field (7) use 55 too. So **fx-sends cannot be in a
-  build with both of them**; the patcher refuses that build ("the mods need
-  62 bits of sound storage"). It links with either one of them (core 0.10:
-  30 bits with lfo-rnd 1.3, 46 with voice-dac 1.5).
-- Core 0.10 (6 Nov 2026): builds and links unchanged, alone and with the
-  rytm2_mods mods (mk2/README.md); not yet run on 0.10.
+- 1.1 needs core-ar2 0.10 (lockable sound and kit fields, `init`,
+  `core_param_values`); 1.0 needs 0.4.
+- Sound storage: CHR (7) and, as CHR is an LFO destination, core's
+  `core_lfo_dst` (7): 14 of 56 bits. With lfo-rnd 1.3 (16) it is 30; with
+  voice-dac 1.5 (32) 46. With both it is 62, so **fx-sends cannot be in a
+  build with both of them** ("the mods need 62 bits of sound storage").
+- Kit storage: the seven settings (49) and core's `core_fx_lfo_dst` (7): 56
+  of the kit's 64 bits. duck 1.1 needs 32 more, so **fx-sends 1.1 and duck 1.1
+  cannot be in one build** ("the mods need 88 bits of kit storage"). Decided
+  2026-11-06: mods are judged on their own where storage is the limit.
+- Linked (6 Nov 2026, elekloader 7d0bf15): alone; with cpu-probe and
+  tx-machines; with those and the rytm2_mods mods without voice-dac, and
+  without lfo-rnd. Not yet run in an emulator or on a unit.
 - With core 0.3 (before the page tables), linked and run in the emulator with
   core, ae-pages, cpu-probe, duck and the
   rytm2_mods v1.2 mods minus comp-preview (which then conflicted with duck) and
@@ -98,7 +122,17 @@ with the chorus on. With core's page step (no lfo-rnd in the build) the header
 names CHORUS SEND; with DAC SUM, the chorus and the preview together, the audio
 interrupt reads 92% and peaks at 94%, nothing audible.
 
-**Not checked on hardware:** the level of the return against the delay and
+**1.1 not checked anywhere yet** (built and linked only): the two pages and
+their knobs, CHR's and the chorus settings' locks, scene locks, performances,
+LFO and routes, the CCs and NRPNs, the chorus settings kept through a kit save,
+a reload and a power cycle without a separate save (1.1 sends no kit change
+notice), that the borrowed ids 450..456 are kept from stock's FX setter on the
+FX track (core-ar2 0.9 says core does this), and the audio's cost of the reads
+(about 0.9% of a block for CHR's read with its routes, on a unit, and well
+under 1% for the seven in one call, by core-ar2's figures). It changes the
+sound path, so it waits for the owner's listening check too.
+
+**1.0, not checked on hardware:** the level of the return against the delay and
 reverb, and CHR surviving a kit save, a reload and a power
 cycle (the same storage path lfo-rnd and voice-dac use, which was
 hardware-tested for them).

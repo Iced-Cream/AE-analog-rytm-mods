@@ -8,8 +8,14 @@
         |   ATK  attack, 0 instant .. 127 ~85 ms (time constant)
         |   HLD  hold at full depth after a hit, 0 .. 170 ms
         |   REL  release, 5 ms .. ~2 s (time constant)
-        | Global (one setting for the unit), held in RAM: back to the defaults
-        | (SRC OFF) at power-up, as on the MK1.
+        | 1.1 (core-ar2 0.10): the five are kit fields (duck_src .. duck_rel,
+        | the MK1's defaults as their inits, SRC OFF), so each kit keeps its own,
+        | and lockable: the FX track's parameters, p-locked with an FX trig
+        | held, locked in scenes and performances, on MIDI on the FX channel.
+        | DEP, ATK, HLD and REL are FX LFO destinations; SRC, a choice of track,
+        | is not, and jumps ("smooth": false). Every block the engine reads the
+        | five as stock would play them (core_param_values on track 12) into
+        | dk_set, which it reads as before. 1.0 held them in RAM, global.
         |
         | The engine. The audio interrupt calls 0x40109940(frame) once a block
         | (`jsr` at 0x401212b2): the amp envelopes, the overdrive and, for each
@@ -57,6 +63,14 @@
         .equ    G_REL,          4
         .equ    KNOBS,          5
 
+        .extern core_store_get, core_store_set, core_param_handle, core_param_values
+        .extern duck_src, duck_dep, duck_atk, duck_hld, duck_rel
+        .equ    PARAM_NONE,     0x80000000        | CORE_PARAM_NONE
+        .equ    FX_TRACK,       12
+        .equ    LIVE_KITS,      0x412558e3        | the kits as edited
+        .equ    LIVE_KIT_SIZE,  2531
+        .equ    WORKING_KIT,    0x405c8f20+0x19d3f7 | the working kit's index, a long, unaligned
+
         .text
 
         | ==================================================================
@@ -68,6 +82,7 @@ duck_gate:
         move.l  4(%sp),-(%sp)
         jsr     VCA_FN
         addq.l  #4,%sp
+        bsr.w   dk_read                           | the settings as stock would play them
         lea     -20(%sp),%sp
         movem.l %d2-%d5/%a2,(%sp)
         lea     dk_state,%a2
@@ -174,9 +189,106 @@ duck_gate:
         lea     20(%sp),%sp
         rts
 
+        | ------------------------------------------------------------------
+        | dk_read() - the five settings on the FX track (the kit's, the FX
+        | trig's p-lock, the scene's lock, smoothed but SRC, plus the
+        | performances and the FX LFO; core_param_values, 8.8) into dk_set,
+        | rounded and clamped to each knob's range. Handles on the first call.
+        | C convention; clobbers d0/d1/a0/a1.
+        | ------------------------------------------------------------------
+        .align  2
+dk_read:
+        lea     dk_h,%a0
+        tst.l   (%a0)
+        bne.s   3f
+        move.l  %d2,-(%sp)
+        moveq   #0,%d2
+2:      lea     dk_fields,%a0
+        move.l  (%a0,%d2.l*4),-(%sp)
+        jsr     core_param_handle
+        addq.l  #4,%sp
+        lea     dk_h,%a0
+        move.l  %d0,(%a0,%d2.l*4)
+        addq.l  #1,%d2
+        moveq   #KNOBS,%d0
+        cmp.l   %d0,%d2
+        bne.s   2b
+        move.l  (%sp)+,%d2
+        lea     dk_h,%a0
+        tst.l   (%a0)
+        beq.s   9f                                | no codes: dk_set keeps its last
+3:      pea     dk_out
+        clr.l   -(%sp)                            | flags
+        pea     KNOBS                             | n
+        pea     dk_h
+        pea     FX_TRACK
+        jsr     core_param_values
+        lea     20(%sp),%sp
+        move.l  %d2,-(%sp)
+        lea     dk_out,%a0
+        lea     dk_set,%a1
+        moveq   #0,%d2                            | knob
+4:      move.l  (%a0)+,%d0
+        cmp.l   #PARAM_NONE,%d0
+        beq.s   6f
+        add.l   #128,%d0
+        asr.l   #8,%d0
+        bpl.s   5f
+        moveq   #0,%d0
+5:      lea     knob_max,%a1
+        mvz.b   (%a1,%d2.l),%d1
+        cmp.l   %d1,%d0
+        ble.s   7f
+        move.l  %d1,%d0
+7:      lea     dk_set,%a1
+        move.b  %d0,(%a1,%d2.l)
+6:      addq.l  #1,%d2
+        moveq   #KNOBS,%d0
+        cmp.l   %d0,%d2
+        bne.s   4b
+        move.l  (%sp)+,%d2
+9:      rts
+
         | ==================================================================
         | The page, through core-ar2's core_pages and core_params (C convention)
         | ==================================================================
+
+        | cur_kit() -> d0 = the working kit as edited (the FX track's item), or
+        | 0. Clobbers d0/d1/a0.
+        .align  2
+cur_kit:
+        lea     WORKING_KIT,%a0
+        moveq   #4,%d1
+        moveq   #0,%d0
+1:      lsl.l   #8,%d0
+        move.b  (%a0)+,%d0
+        subq.l  #1,%d1
+        bne.s   1b
+        cmp.l   #128,%d0
+        bcc.s   8f
+        move.l  #LIVE_KIT_SIZE,%d1
+        mulu.l  %d1,%d0
+        add.l   #LIVE_KITS,%d0
+        rts
+8:      moveq   #0,%d0
+        rts
+
+        | kit_get(d0 = knob 0..4) -> d0 = its field in the working kit (0 with
+        | no kit). Clobbers d0/d1/a0/a1.
+        .align  2
+kit_get:
+        move.l  %d0,-(%sp)
+        bsr.s   cur_kit
+        move.l  (%sp)+,%d1
+        tst.l   %d0
+        beq.s   9f
+        clr.l   -(%sp)                            | index, unused for a kit
+        move.l  %d0,-(%sp)                        | item: the kit
+        lea     dk_fields,%a0
+        move.l  (%a0,%d1.l*4),-(%sp)              | the field's descriptor
+        jsr     core_store_get
+        lea     12(%sp),%sp
+9:      rts
 
         | knob_of(d0 = id) -> d0 = knob 0..4 or -1 (flags set)
         .align  2
@@ -196,8 +308,7 @@ dk_get:
         move.l  4(%sp),%d0
         bsr.w   knob_of
         bmi.s   9f
-        lea     dk_set,%a0
-        mvz.b   (%a0,%d0.l),%d0
+        bsr.s   kit_get
         lsl.l   #8,%d0
         move.l  8(%sp),%a0
         move.l  %d0,(%a0)
@@ -207,48 +318,80 @@ dk_get:
         rts
 
         | int delta(void *view, long id, long delta, long func): the delta in 8.8, added
-        | to the knob's 8.8 value (dk_acc), whose whole part is the setting
+        | to the knob's 8.8 value, whose whole part is the setting in the
+        | working kit; dk_acc keeps the turn's fraction while the kit holds its
+        | whole part
         .align  2
 dk_delta:
         move.l  8(%sp),%d0
         bsr.w   knob_of
-        bmi.s   8f
-        move.l  %d0,%a1                           | the knob
+        bmi.w   8f
+        lea     -12(%sp),%sp
+        movem.l %d2-%d4,(%sp)
+        move.l  %d0,%d2                           | d2 = the knob
+        bsr.w   cur_kit
+        move.l  %d0,%d3                           | d3 = the kit
+        beq.s   7f
+        move.l  %d2,%d0
+        bsr.w   kit_get
+        move.l  %d0,%d4                           | d4 = the stored setting
+        lsl.l   #8,%d0
         lea     dk_acc,%a0
-        mvz.w   (%a0,%d0.l*2),%d0
-        add.l   12(%sp),%d0
-        bpl.s   1f
+        mvz.w   (%a0,%d2.l*2),%d1
+        move.l  %d1,%a1
+        lsr.l   #8,%d1
+        cmp.l   %d4,%d1                           | dk_acc still on the stored step:
+        bne.s   1f
+        move.l  %a1,%d0                           | keep its fraction
+1:      add.l   24(%sp),%d0                       | the delta
+        bpl.s   2f
         clr.l   %d0
-1:      lea     knob_max,%a0
-        mvz.b   (%a0,%a1.l),%d1
+2:      lea     knob_max,%a0
+        mvz.b   (%a0,%d2.l),%d1
         lsl.l   #8,%d1
         cmp.l   %d1,%d0
-        ble.s   2f
+        ble.s   3f
         move.l  %d1,%d0
-2:      lea     dk_acc,%a0
-        move.w  %d0,(%a0,%a1.l*2)
+3:      lea     dk_acc,%a0
+        move.w  %d0,(%a0,%d2.l*2)
         lsr.l   #8,%d0
-        lea     dk_set,%a0
-        move.b  %d0,(%a0,%a1.l)
+        cmp.l   %d4,%d0
+        beq.s   7f
+        move.l  %d0,-(%sp)                        | value
+        clr.l   -(%sp)                            | index
+        move.l  %d3,-(%sp)                        | item: the kit
+        lea     dk_fields,%a0
+        move.l  (%a0,%d2.l*4),-(%sp)
+        jsr     core_store_set
+        lea     16(%sp),%sp
+7:      movem.l (%sp),%d2-%d4
+        lea     12(%sp),%sp
         moveq   #1,%d0
         rts
 8:      moveq   #0,%d0
         rts
 
-        | int text(struct core_text *t): t = {obj, id, value, buf}
+        | int text(struct core_text *t): t = {obj, id, value, buf}. SRC: the
+        | track's name, from the value shown (a held trig's lock, a scene's);
+        | the others pass, and core writes the number, as for any lockable
+        | parameter.
         .align  2
 dk_text:
         move.l  4(%sp),%a1
         move.l  4(%a1),%d0                        | the id
         bsr.w   knob_of
-        bmi.s   8f
-        move.l  %d0,%d1
-        lea     dk_set,%a0
-        mvz.b   (%a0,%d0.l),%d0
+        bne.s   8f                                | not SRC (or not ours): pass
         move.l  4(%sp),%a1
-        move.l  12(%a1),%a1                       | the buffer
-        tst.l   %d1
-        bne.s   2f
+        move.l  8(%a1),%d0                        | the value, 8.8
+        add.l   #128,%d0
+        asr.l   #8,%d0
+        bpl.s   4f
+        moveq   #0,%d0
+4:      moveq   #12,%d1
+        cmp.l   %d1,%d0
+        ble.s   5f
+        move.l  %d1,%d0
+5:      move.l  12(%a1),%a1                       | the buffer
         lea     src_names,%a0                     | SRC: the track's name
         lsl.l   #2,%d0
         add.l   %d0,%a0
@@ -256,34 +399,10 @@ dk_text:
         beq.s   3f
         move.b  %d1,(%a1)+
         bra.s   1b
-2:      bsr.s   put_u3
 3:      clr.b   (%a1)
         moveq   #1,%d0
         rts
 8:      moveq   #0,%d0
-        rts
-
-        | put_u3(d0 = 0..127, a1 = out) - decimal, no leading zeros, a1 past it.
-        | Clobbers d0.
-put_u3:
-        move.l  %d1,-(%sp)
-        moveq   #100,%d1
-        cmp.l   %d1,%d0
-        bcs.s   1f
-        sub.l   %d1,%d0
-        move.b  #0x31,(%a1)+                      | at most 127: the hundreds are 1
-        divu.w  #10,%d0
-        bra.s   2f
-1:      divu.w  #10,%d0
-        tst.w   %d0
-        beq.s   3f
-2:      move.l  %d0,%d1
-        add.l   #0x30,%d1
-        move.b  %d1,(%a1)+
-3:      swap    %d0
-        add.l   #0x30,%d0
-        move.b  %d0,(%a1)+
-        move.l  (%sp)+,%d1
         rts
 
         | ev_tick, until done once: the five knobs' RAM records (built at boot
@@ -332,10 +451,26 @@ duck_page:      .long   PAGE_DUCK, str_page       | core_pages: {page, name, A..
                 .long   ID0+4, 0, 0, 0
 duck_params:    .long   ID0, ID0+KNOBS-1, dk_get, dk_delta, dk_text  | core_params
 dk_state:       .long   0, 0, 1                   | env, hold, armed
-dk_acc:         .short  0, 90<<8, 3<<8, 22<<8, 36<<8  | the settings in 8.8
+dk_acc:         .short  0, 90<<8, 3<<8, 22<<8, 36<<8  | the turns' fractions, 8.8
 dk_ready:       .byte   0
 knob_max:       .byte   12, 127, 127, 127, 127
-dk_set:         .byte   0, 90, 3, 22, 36          | SRC DEP ATK HLD REL (defaults)
+dk_set:         .byte   0, 90, 3, 22, 36          | SRC DEP ATK HLD REL: the engine's copy
+        .align  2
+dk_fields:      .long   duck_src, duck_dep, duck_atk, duck_hld, duck_rel
+        .globl  duck_src_param, duck_dep_param, duck_atk_param, duck_hld_param, duck_rel_param
+        .macro  DK_PARAM name, k, max
+duck_\name\()_param:                              | core_lock_params: struct core_lock_param
+                .long   duck_\name, ID0+\k
+                .short  0, \max
+                .long   duck_str_\name, duck_str_\name\()_l, str_cat
+        .endm
+        DK_PARAM src, 0, 12
+        DK_PARAM dep, 1, 127
+        DK_PARAM atk, 2, 127
+        DK_PARAM hld, 3, 127
+        DK_PARAM rel, 4, 127
+dk_h:           .space  KNOBS*4                   | their handles
+dk_out:         .space  KNOBS*4                   | core_param_values' answers
 src_voice:      .byte   0, 2, 7, 7, 1, 3, 5, 5, 4, 4, 6, 6  | BD SD RS CP BT LT MT HT CH OH CY CB
         | physical voice -> its receive-buffer offset, +8 + 4 * slot, from the
         | stock map 0x401ef480 (0, 3, 1, 4, 6, 5, 7, 2)
@@ -343,6 +478,7 @@ slot_off:       .byte   8, 20, 12, 24, 32, 28, 36, 16
 src_names:      .ascii  "OFF\0BD\0\0SD\0\0RS\0\0CP\0\0BT\0\0LT\0\0MT\0\0HT\0\0CH\0\0OH\0\0CY\0\0CB\0\0"
         .globl  duck_str_group, duck_str_src_l, duck_str_src, duck_str_dep_l, duck_str_dep
         .globl  duck_str_atk_l, duck_str_atk, duck_str_hld_l, duck_str_hld, duck_str_rel_l, duck_str_rel
+str_cat:        .asciz  "DUCK"                    | DUCK:Duck Depth in the FX LFO's DST
 str_page:       .asciz  "DUCK"
 duck_str_group: .asciz  "DUCK"
 duck_str_src_l: .asciz  "Duck Source"

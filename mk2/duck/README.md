@@ -4,7 +4,8 @@ DUCK, AE 0012, ported to the MKII as an elemod: sidechain-style pumping
 without the analog compressor. Every audio block the other voices' analog VCA
 words are scaled by a gain that dips when the key track's voice hits.
 
-With the FX track selected, press AMP (COMP) a second time for the DUCK page:
+With the FX track selected, press AMP (COMP) a second time for the DUCK page
+(1.1, core-ar2 0.10):
 
 | knob | range | what |
 |---|---|---|
@@ -14,8 +15,14 @@ With the FX track selected, press AMP (COMP) a second time for the DUCK page:
 | HLD | 0..127 | hold at full depth after a hit, 0 to 170 ms |
 | REL | 0..127 | release, 5 ms to about 2 s (time constant) |
 
-The settings are global and held in RAM: they return to the defaults (SRC OFF)
-at power-up, as on the MK1. The delay and reverb returns are not ducked.
+From 1.1 the five are saved with the kit and are the FX track's lockable
+parameters: p-locked with an FX trig held, locked in scenes, given performance
+depths, and on MIDI on the FX channel (an NRPN, MSB 4, and a CC from core's
+pool). DEP, ATK, HLD and REL are FX LFO destinations (DUCK:Duck Depth and so
+on); SRC picks a track, so it is not, and a lock on it jumps rather than
+glides. A new kit, or one saved without duck, starts at SRC OFF, DEP 90, ATK
+3, HLD 22, REL 36 (field inits). In 1.0 they were global, held in RAM, back to
+those defaults at power-up. The delay and reverb returns are not ducked.
 Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 
 ## What changed from the MK1
@@ -29,15 +36,33 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 - **Knobs.** The MKII has no spare "Error" records left once rytm2_mods is in,
   so the knobs are the hidden HH TEST machine's records 443..447, renamed. At
   the first UI tick their RAM records take the dial art and encoder feel of
-  COMP's MIX knob. The settings keep 8.8 fractions, as stock does, so turns
-  smaller than a step add up.
+  COMP's MIX knob. A turn's 8.8 fraction is kept while the kit holds its
+  whole step, so turns smaller than a step add up.
+- **Storage and reads (1.1).** Five kit fields (`duck_src`, 4 bits,
+  `"smooth": false`; `duck_dep` .. `duck_rel`, 7 bits). Every block the engine
+  reads all five as stock would play them on the FX track (one
+  `core_param_values` call: the kit's value, the FX trig's p-lock, the scene's
+  lock, smoothed but for SRC, plus the performances and the FX LFO). SRC's
+  value text names the track from the value shown, so a held trig shows its
+  lock; the others are core's numbers.
 - **Page.** Page 14, after COMP (page 11) in the COMP view's list, through
   core-ar2 0.4's page tables (`core_pages`, `core_params`) and page-key
   lists (`core_view_pages`, order 30: after comp-preview's preview).
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.4 (its page tables).
+- 1.1 needs core-ar2 0.10 (lockable kit fields, `init`, `core_param_values`);
+  1.0 needs 0.4.
+- Kit storage: 32 bits and core's `core_fx_lfo_dst` (7), 39 of 64. fx-sends
+  1.1 needs 56, so **duck 1.1 and fx-sends 1.1 cannot be in one build**
+  ("the mods need 88 bits of kit storage"). Decided 2026-11-06: mods are
+  judged on their own where storage is the limit.
+- 1.1 linked (6 Nov 2026, elekloader 7d0bf15) alone, with cpu-probe and
+  tx-machines, and with those and all eleven rytm2_mods mods. Not yet run in
+  an emulator or on a unit: the locks, scene locks, performances, FX LFO, MIDI,
+  the settings kept with the kit, and the cost of the reads (well under 1% of
+  a block for the five in one call, by core-ar2's figures) are unchecked, and
+  it changes the sound path, so it waits for the owner's listening check.
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
