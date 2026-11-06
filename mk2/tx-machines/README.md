@@ -1,4 +1,4 @@
-# TX machines (MKII), 0.2: all seven machines
+# TX machines (MKII), 0.3: all seven machines, XT TX-8's long decays and SD TX-9's fifth
 
 Port of [0009-tx-machines](../../mods/0009-tx-machines/design.md) (Analog Rytm
 MK1) to the Analog Rytm MKII, OS 1.74, as an elekloader elemod on core-ar2 0.5.
@@ -127,11 +127,104 @@ TYPE 1 and 2 (79..188 Hz), within 1 dB of the MD everywhere; t30 is within
 12 % of before (325 / 240 / 265 ms at PTC 64, MD 350 / 255 / 240) and the
 main's pitch is unchanged.
 
-**Known limits, as on the MK1 port:** XT TX-8's longest decays reach about
-1.1 s against the MD's ~3 s, because the stock XT CLASSIC damps hard past
-~1.5 s (the author notes this). SD TX-9's fifth (the second oscillator at
-1.5x) is 20-25 dB weaker than on the MD. Both are left as the MK1 port has
-them.
+**Known limits of 0.2, as on the MK1 port, and what 0.3 does about them.**
+XT TX-8's longest decays reach about 1.1 s against the MD's ~3 s, and SD
+TX-9's fifth (the second oscillator, at 1.47x with DTU 64) is 20-25 dB weaker
+than on the MD. A trace of the OS 1.74 code and a unit run on stock XT and SD
+CLASSIC (1 Nov 2026, hardware tests T57/T58) found both fixable in this mod,
+with no core change:
+
+- **XT TX-8 decay.** The cause is not a cut at ~1.5 s, as written before:
+  XT CLASSIC counts blocks from the note in the voice's state long +0x10 and
+  starts damping harder only past 4500 blocks (3.0 s; on the unit the slope
+  steepens at 3.0 s and nowhere near 1.5 s). The short ring is XT CLASSIC's
+  DEC range: its damping word (frame +0x7c LT, +0x80 MT/HT) moves only toward
+  a limit as DEC rises, so stock DEC 127 rings 2.15 s at 91 Hz, 1.1 s at
+  141 Hz and 0.6 s at 191 Hz on the unit, while the word sits ~32,000 units
+  from its clamp. 0.3 moves the word past stock's range after XT CLASSIC
+  has written it (x8_ext), by as much as the TX-8's DEC table asks for past
+  DEC 0x7f00, in the direction of the voice's calibration T0 (which makes it
+  right on the unit, T0 < 0, and on the emulator, T0 > 0), and holds the
+  3.0 s count off for 6 s from the note (x8_hold), after which stock's own
+  ramp ends the note as before. How far the word must go per octave of t30
+  is not known yet (stock's DEC term says ~157 units, a pitch octave says
+  far more), so 0.3 starts from stock's DEC slope (X8_XK) and a test build
+  (`"defsym": {"X8_SWEEP": 1}` in mod.json; never released) maps it on the
+  unit: there XT TX-8's TUN knob moves the word 32 units per step instead
+  of fine-tuning, so TUN 0, 2, 4 .. 127 sweep 0 .. 4064 units at one DEC.
+  X8_XK is refitted from that (tools/gen_tx_tables.py --mk2-x8x).
+- **SD TX-9 fifth.** BAL can't do it: SD CLASSIC crossfades the oscillators
+  (osc 2 = u, osc 1 = 1 - u), and on the unit the fifth reaches the MD's
+  -10..-12 dB re the body only at BAL ~115, which costs the body ~20 dB.
+  0.3 plays the fifth digitally into stream 1, as XT TX-9's 2/3 partial is
+  played: a sine at osc 2's own tune word (TUN + DET, the bend included),
+  -11 dB re the body's MD peak, decaying with the body (s9_fifth,
+  --mk2-s9f). BAL stays 0x2000 and the analog osc 2 stays where it was.
+
+**0.3 status.** Emulator (rytm-emu, 1 Nov 2026, build TX03 / TX3S): links
+with core-ar2 0.5 on stock 1.74, storage as 0.2. XT CLASSIC writes the
+damping word as a 16-bit store at ctx +0x7c / +0x80, and x8_ext moves it.
+The block count at state +0x10 holds at 4401 until 6 s. The fifth plays at
+276.2 Hz into stream 1 between SD CLASSIC and the noise. Every machine runs
+under the sequencer with no fault.
+
+**0.3, unit** (T59, 1 Nov 2026, TX3SH / TX03H = the first values +
+analoghealth, unit T0 -49974 LT / -50015 MT):
+
+- **The damping word is far more sensitive than stock's DEC term suggests.**
+  The sweep build (then 32 units a step) self-oscillated from 512 units at
+  every pitch. Zero damping lies only ~90-115 units past stock's longest
+  word. At the first X8_XK (0.0503) XT TX-8's DEC 127 rang ~17 s at 91 Hz
+  and self-oscillated at 141 / 191 Hz (stock's ramp still ended every note
+  after the 6 s hold).
+- **Refit:** X8_XK 12.5 / 1024 at X8_ISAT 103 (0.13 octave rms against the
+  takes), and the move is capped at X8_XMAX 70 units, so no setting can
+  reach zero damping. The sweep build now steps 2 units (0..254), to map
+  the slope and the zero point finely before release.
+- **SD TX-9's fifth** came out at 276.1 Hz on a 191.9 Hz body (the MD has
+  272.5 on 183.3: the whole machine sits sharp, see the tuning below) and -1.8 / -2.7 dB re the body at DEC
+  64 / 127, against the MD's -12.3 / -9.6 dB. S9F_DB is lowered from -11 to
+  -19. The MD's fifth also falls 1-4 dB faster than the body, which is left
+  for the next take.
+
+**0.3 refit, unit** (T63, 1 Nov 2026, TX4SH / TX04H = f3b7841 +
+analoghealth). A sweep at 16-unit steps puts zero damping at about 112 /
+93 / 105 units past stock's longest word (LT 90, MT 140 / 191 Hz). The
+decay rate falls almost linearly with the offset, and every note ended.
+XT TX-8 now rings as follows, and no setting self-oscillates:
+
+| XT TX-8 t30, DEC 96 / 112 / 127 | 0.3 | TX-8 target | 0.2 at DEC 127 |
+|---|---|---|---|
+| LT 90 Hz | 1.15 / 1.95 / 2.65 s | 0.97 / 1.72 / 2.99 s | 2.11 s |
+| MT 140 Hz | 0.88 / 1.40 / 2.27 s | 0.65 / 1.14 / 1.98 s | 1.08 s |
+| MT 191 Hz | 0.60 / 0.80 / 1.40 s | 0.48 / 0.85 / 1.48 s | 0.53 s |
+
+DEC 112-127 are within about 0.2 octave of the targets. DEC 96 runs 0.2-0.4
+octave long, from the x8_dec table that 0.2 already had. The largest move
+used is 65 units, 28 under the lowest zero point measured. SD TX-9's fifth
+reads -9.8 / -10.7 dB re the body at DEC 64 / 127 (MD -12.3 / -9.6), at
+276 Hz on a 192 Hz body. Its decay is close to the MD's, which falls 2-4 dB
+faster at DEC 64. The constants stay as they are.
+
+**0.3 redo, unit** (T123, 5 Nov 2026, the same builds, through the Sidecar
+Pi in USB mirror mode) repeats T63 within 0.05-0.1 s and moves no constant.
+The "quiet first hits" an earlier take showed after a TYP change by CC are
+not real: the change gives a ~-57 dBFS blip before the note, which that
+analysis took for the hit.
+
+**SD TX-9 tuning (0.3).** Every SD TX-9 build up to here sits 72-79 cents
+sharp of the MD at PTC 0 / 64 / 127 (127.8 / 191.8 / 254.7 Hz against
+122.6 / 183.2 / 243.7), and its fifth runs at x1.439 of the body against
+the MD's x1.484. SD CLASSIC on the MKII sits a steady +39 cents over the
+tune model t9sd_ptc was built for, and the MD sits 34-40 cents under the
+formula itself. t9sd_ptc is refitted to the MD's pitches on the MKII, and
+the digital fifth adds SD CLASSIC's offset and 16 cents for the MD's ratio
+(tools/gen_tx_tables.py --mk2-s9t / --mk2-s9f). SD TX-8 carries the same
+SD CLASSIC offset (+41..+43 cents over the MD at PTC 0 / 64), so its
+TX8SD_TUNOFF drops it too. On the unit (T140, 6 Nov 2026, TX05H through
+the Sidecar mirror) SD TX-9 reads 122.6 / 183.2 / 243.8 Hz at PTC 0 / 64 /
+127 (MD 122.6 / 183.2 / 243.7), its fifth x1.484-1.488 (MD x1.484), and SD
+TX-8 125.1 / 250.1 Hz at PTC 0 / 64 (MD 124.8 / 249.6): all within 4 cents.
 
 **0.1 (BD TX-9, SD TX-9):**
 
