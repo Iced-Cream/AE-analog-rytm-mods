@@ -92,7 +92,16 @@ the tail has died (about 3 s).
   2026-11-06: mods are judged on their own where storage is the limit.
 - Linked (6 Nov 2026, elekloader 7d0bf15): alone; with cpu-probe and
   tx-machines; with those and the rytm2_mods mods without voice-dac, and
-  without lfo-rnd. Not yet run in an emulator or on a unit.
+  without lfo-rnd.
+- 1.1 in the emulator (rytm-emu, 6 Nov 2026, core 0.10 + cpu-probe +
+  tx-machines + fx-sends): SEND and CHORUS pages show (CHORUS on DELAY's
+  second press); knob turns write the sound and kit fields; CC and NRPN reach
+  the engine's copies; the sound LFO on CHR and the FX LFO on PRE and DEP sweep
+  0..127; the fields survive a power-off without a save; a CHR lock recorded
+  live by CC plays on its trig only. Open: a lock made with a trig held and
+  the knob turned shows on the knob but did not reach playback in the
+  emulator (not yet known if the method or the mod is at fault); scene locks,
+  performances, vel/AT and the read cost are unchecked. Not run on a unit.
 - With core 0.3 (before the page tables), linked and run in the emulator with
   core, ae-pages, cpu-probe, duck and the
   rytm2_mods v1.2 mods minus comp-preview (which then conflicted with duck) and

@@ -58,11 +58,14 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   ("the mods need 88 bits of kit storage"). Decided 2026-11-06: mods are
   judged on their own where storage is the limit.
 - 1.1 linked (6 Nov 2026, elekloader 7d0bf15) alone, with cpu-probe and
-  tx-machines, and with those and all eleven rytm2_mods mods. Not yet run in
-  an emulator or on a unit: the locks, scene locks, performances, FX LFO, MIDI,
-  the settings kept with the kit, and the cost of the reads (well under 1% of
-  a block for the five in one call, by core-ar2's figures) are unchecked, and
-  it changes the sound path, so it waits for the owner's listening check.
+  tx-machines, and with those and all eleven rytm2_mods mods. In the
+  emulator (6 Nov 2026, core 0.10 + cpu-probe + tx-machines + duck): the
+  knobs write the kit fields, CC and NRPN reach the engine, SRC jumps, an FX
+  LFO routed to SRC does not move it, and the fields survive a power-off
+  without a save. Unchecked: trig-held and scene locks, performances, the
+  read cost (well under 1% of a block for the five in one call, by
+  core-ar2's figures). Not run on a unit; it changes the sound path, so it
+  waits for the owner's listening check.
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.

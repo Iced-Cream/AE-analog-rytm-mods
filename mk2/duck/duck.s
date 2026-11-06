@@ -455,7 +455,7 @@ dk_acc:         .short  0, 90<<8, 3<<8, 22<<8, 36<<8  | the turns' fractions, 8.
 dk_ready:       .byte   0
 knob_max:       .byte   12, 127, 127, 127, 127
 dk_set:         .byte   0, 90, 3, 22, 36          | SRC DEP ATK HLD REL: the engine's copy
-        .align  2
+        .align  4
 dk_fields:      .long   duck_src, duck_dep, duck_atk, duck_hld, duck_rel
         .globl  duck_src_param, duck_dep_param, duck_atk_param, duck_hld_param, duck_rel_param
         .macro  DK_PARAM name, k, max

@@ -950,7 +950,7 @@ acc:            .short  0, 40<<8, 24<<8, 64<<8, 96<<8, 0, 0, 100<<8  | the turns
 globals:        .byte   40, 24, 64, 96, 0, 0, 100 | PRE SPD DEP WID FDB HPF VOL: the audio's copy
 ready:          .byte   0
 chr_rr:         .byte   VOICES-1                  | chr_read's last voice
-        .align  2
+        .align  4
         .globl  fx_sends_chr_param
 fx_sends_chr_param:                               | core_lock_params: struct core_lock_param
                 .long   fx_sends_chr, ID0         | field, the page knob's id
