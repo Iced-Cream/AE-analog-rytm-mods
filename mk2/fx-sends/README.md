@@ -99,9 +99,12 @@ the tail has died (about 3 s).
   the engine's copies; the sound LFO on CHR and the FX LFO on PRE and DEP sweep
   0..127; the fields survive a power-off without a save; a CHR lock recorded
   live by CC plays on its trig only. Open: a lock made with a trig held and
-  the knob turned shows on the knob but did not reach playback in the
-  emulator (not yet known if the method or the mod is at fault); scene locks,
-  performances, vel/AT and the read cost are unchecked. Not run on a unit.
+  a knob turned shows on the knob but is not stored. Core 0.10 treats the
+  borrowed TEST-record ids (449..456) as stock's, so the turn goes to stock's
+  lock routine (on the FX track, likely a stock FX parameter's lock). The
+  core-ar2 fix is handed over; with it, held locks on CHR and PRE stored and
+  played in the emulator. Scene locks, performances, vel/AT and the read cost
+  are unchecked. Not run on a unit.
 - With core 0.3 (before the page tables), linked and run in the emulator with
   core, ae-pages, cpu-probe, duck and the
   rytm2_mods v1.2 mods minus comp-preview (which then conflicted with duck) and

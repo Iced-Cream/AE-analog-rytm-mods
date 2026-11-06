@@ -62,7 +62,11 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   emulator (6 Nov 2026, core 0.10 + cpu-probe + tx-machines + duck): the
   knobs write the kit fields, CC and NRPN reach the engine, SRC jumps, an FX
   LFO routed to SRC does not move it, and the fields survive a power-off
-  without a save. Unchecked: trig-held and scene locks, performances, the
+  without a save. A lock made with an FX trig held and a
+  knob turned is not stored on core 0.10, which treats ids 443..447 as the
+  FX setter's (likely locking a stock FX parameter instead); the core-ar2 fix
+  is handed over, and with it DEP's held lock stored and played in the
+  emulator. Unchecked: scene locks, performances, the
   read cost (well under 1% of a block for the five in one call, by
   core-ar2's figures). Not run on a unit; it changes the sound path, so it
   waits for the owner's listening check.
