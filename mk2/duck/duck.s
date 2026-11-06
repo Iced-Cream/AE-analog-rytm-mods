@@ -437,7 +437,59 @@ duck_tick:
         bne.s   1b
         move.l  #12<<8,%d0                        | SRC: 0..12
         move.l  %d0,PARAM_INFO+ID0*PI_STRIDE+8
+        | SRC draws its track's name in place of the dial, as LFO MOD draws
+        | FREE: the draw callback is a functor {obj, 0, manager, invoker};
+        | MOD's empty one lends its obj and manager, the invoker is dk_src_draw
+        lea     PARAM_INFO+ID_TEXT*PI_STRIDE+PI_DRAW,%a0
+        lea     PARAM_INFO+ID0*PI_STRIDE+PI_DRAW,%a1
+        move.l  (%a0),(%a1)
+        move.l  4(%a0),4(%a1)
+        move.l  8(%a0),8(%a1)
+        lea     dk_src_draw,%a0
+        move.l  %a0,12(%a1)
 9:      rts
+
+        | SRC's knob, as text: (obj, value 8.8, bitmap, x, y), as stock's MOD
+        | draws (0x400fbe0e): the font, then the string centred over "XXX"
+        .equ    ID_TEXT,        70                | LFO MOD: a text knob
+        .equ    KNOB_FONT,      0x40071be8
+        .equ    FONT_OBJ,       0x417e389c
+        .equ    DRAW_TEXT,      0x4007154c
+        .equ    STR_FMT,        0x402413d4        | "%s"
+        .equ    STR_WIDTH,      0x402413d8        | "XXX"
+        .align  2
+dk_src_draw:
+        move.l  %d2,-(%sp)
+        move.l  12(%sp),%d2                       | the value, 8.8
+        add.l   #128,%d2
+        asr.l   #8,%d2
+        bpl.s   1f
+        moveq   #0,%d2
+1:      moveq   #12,%d0
+        cmp.l   %d0,%d2
+        ble.s   2f
+        move.l  %d0,%d2
+2:      lsl.l   #2,%d2
+        lea     src_names,%a0
+        add.l   %a0,%d2                           | the name
+        pea     FONT_OBJ
+        jsr     KNOB_FONT
+        addq.l  #4,%sp
+        move.l  %d2,-(%sp)
+        pea     STR_FMT
+        pea     STR_WIDTH
+        clr.l   -(%sp)
+        pea     1
+        move.l  20+24(%sp),%d1                    | y - 2
+        subq.l  #2,%d1
+        move.l  %d1,-(%sp)
+        move.l  20+24(%sp),-(%sp)                 | x
+        move.l  %d0,-(%sp)                        | the font
+        move.l  16+32(%sp),-(%sp)                 | the bitmap
+        jsr     DRAW_TEXT
+        lea     36(%sp),%sp
+        move.l  (%sp)+,%d2
+        rts
 
         | ==================================================================
         | Data

@@ -37,7 +37,10 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   so the knobs are the hidden HH TEST machine's records 443..447, renamed. At
   the first UI tick their RAM records take the dial art and encoder feel of
   COMP's MIX knob. A turn's 8.8 fraction is kept while the kit holds its
-  whole step, so turns smaller than a step add up.
+  whole step, so turns smaller than a step add up. From 1.1, SRC draws its
+  track's name (OFF, BD .. CB) in place of the dial, as LFO MOD draws FREE:
+  its record's draw callback takes MOD's, with duck's own drawer
+  (`dk_src_draw`, the font and centring that MOD's uses at 0x400fbe0e).
 - **Storage and reads (1.1).** Five kit fields (`duck_src`, 4 bits,
   `"smooth": false`; `duck_dep` .. `duck_rel`, 7 bits). Every block the engine
   reads all five as stock would play them on the FX track (one
@@ -66,7 +69,8 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   knob turned is not stored on core 0.10, which treats ids 443..447 as the
   FX setter's (likely locking a stock FX parameter instead); the core-ar2 fix
   is handed over, and with it DEP's held lock stored and played in the
-  emulator. Unchecked: scene locks, performances, the
+  emulator. SRC draws its track name in place of the dial and follows turns
+  (emulator, 6 Nov 2026). Unchecked: scene locks, performances, the
   read cost (well under 1% of a block for the five in one call, by
   core-ar2's figures). Not run on a unit; it changes the sound path, so it
   waits for the owner's listening check.
