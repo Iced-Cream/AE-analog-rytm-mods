@@ -106,11 +106,17 @@ the tail has died (about 3 s).
   played in the emulator. Scene locks, performances, vel/AT and the read cost
   are unchecked.
 - 1.1 on a unit (T153, 6 Nov 2026, Analog Rytm MKII, OS 1.74, core 0.10 +
-  analoghealth 1.3 + fx-sends 1.1): flashed over stock and back, the planned
-  tests passed, and in the listening check a sound with CHR up sounded fine
-  with the chorus and dry with CHR at 0. Not checked on the unit: trig-held
-  locks (they need the core fix), scene locks, performances, vel/AT, the LFO
-  on CHR, and the CPU load with the chorus on.
+  analoghealth 1.3 + fx-sends 1.1, flashed over stock; duck's build went over
+  it next), each step
+  checked on screen: the SEND page (AMP twice) shows CHR; the CHORUS page
+  (DELAY twice on the FX track) shows PRE SPD DEP WID FDB HPF VOL; CHR on BD
+  by its CC on channel 1 and PRE by its CC on the FX channel move their knobs;
+  a new kit starts with the chorus settings and CHR at their defaults, and
+  PRE 100 and CHR 100 are kept after saving the project, loading another and
+  coming back. Listening check: BD at CHR 100 sounded fine with the chorus,
+  and dry at CHR 0. Not checked on the unit: locks of any kind (trig-held
+  ones need the core fix), scene locks, performances, the LFO and vel/AT on
+  CHR, NRPN, the fields over a power-off, and the CPU load with the chorus on.
 - With core 0.3 (before the page tables), linked and run in the emulator with
   core, ae-pages, cpu-probe, duck and the
   rytm2_mods v1.2 mods minus comp-preview (which then conflicted with duck) and

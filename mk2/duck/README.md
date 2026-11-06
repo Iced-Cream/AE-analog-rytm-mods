@@ -75,11 +75,16 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   read cost (well under 1% of a block for the five in one call, by
   core-ar2's figures).
 - 1.1 on a unit (T153, 6 Nov 2026, Analog Rytm MKII, OS 1.74, core 0.10 +
-  analoghealth 1.3 + duck 1.1): flashed over fx-sends 1.1 and stock went back
-  over it, the planned tests passed, and in the listening check the snare
-  ducked audibly with DUCK on and not with it off. Not checked on the unit:
-  trig-held locks (they need the core fix), scene locks, performances, the
-  FX LFO on the DUCK fields, and the SRC text.
+  analoghealth 1.3 + duck 1.1, flashed over fx-sends 1.1, then stock back
+  over it), each step checked on screen: the DUCK page (COMP twice on the FX
+  track) shows SRC as the text OFF in place of a dial under the label SRC;
+  SRC, DEP and HLD by their CCs on the FX channel move their knobs, SRC
+  reading BD; a new kit starts with DUCK at its defaults, and SRC BD and
+  HLD 60 are kept after saving the project, loading another and coming back.
+  Listening check: with SRC BD and DEP 90 the snare ducked audibly after each
+  BD hit, and not with SRC OFF. Not checked on the unit: locks of any kind
+  (trig-held ones need the core fix), scene locks, performances, the FX LFO
+  on the DUCK fields, NRPN, and the fields over a power-off.
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
