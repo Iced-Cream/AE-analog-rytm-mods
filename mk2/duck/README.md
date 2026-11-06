@@ -40,7 +40,8 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   whole step, so turns smaller than a step add up. From 1.1, SRC draws its
   track's name (OFF, BD .. CB) in place of the dial, as LFO MOD draws FREE:
   its record's draw callback takes MOD's, with duck's own drawer
-  (`dk_src_draw`, the font and centring that MOD's uses at 0x400fbe0e).
+  (`dk_src_draw`, the font and centring that MOD's uses at 0x400fbe0e),
+  and MOD's first record word, so the label stays SRC while it turns.
 - **Storage and reads (1.1).** Five kit fields (`duck_src`, 4 bits,
   `"smooth": false`; `duck_dep` .. `duck_rel`, 7 bits). Every block the engine
   reads all five as stock would play them on the FX track (one

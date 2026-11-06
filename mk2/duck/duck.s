@@ -447,6 +447,8 @@ duck_tick:
         move.l  8(%a0),8(%a1)
         lea     dk_src_draw,%a0
         move.l  %a0,12(%a1)
+        move.l  PARAM_INFO+ID_TEXT*PI_STRIDE,%d0  | MOD's flags: the label stays
+        move.l  %d0,PARAM_INFO+ID0*PI_STRIDE      | SRC while turned
 9:      rts
 
         | SRC's knob, as text: (obj, value 8.8, bitmap, x, y), as stock's MOD
