@@ -73,8 +73,13 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   emulator. SRC draws its track name in place of the dial and follows turns
   (emulator, 6 Nov 2026). Unchecked: scene locks, performances, the
   read cost (well under 1% of a block for the five in one call, by
-  core-ar2's figures). Not run on a unit; it changes the sound path, so it
-  waits for the owner's listening check.
+  core-ar2's figures).
+- 1.1 on a unit (T153, 6 Nov 2026, Analog Rytm MKII, OS 1.74, core 0.10 +
+  analoghealth 1.3 + duck 1.1): flashed over fx-sends 1.1 and stock went back
+  over it, the planned tests passed, and in the listening check the snare
+  ducked audibly with DUCK on and not with it off. Not checked on the unit:
+  trig-held locks (they need the core fix), scene locks, performances, the
+  FX LFO on the DUCK fields, and the SRC text.
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.

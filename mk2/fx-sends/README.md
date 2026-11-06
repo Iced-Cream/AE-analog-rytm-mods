@@ -104,7 +104,13 @@ the tail has died (about 3 s).
   lock routine (on the FX track, likely a stock FX parameter's lock). The
   core-ar2 fix is handed over; with it, held locks on CHR and PRE stored and
   played in the emulator. Scene locks, performances, vel/AT and the read cost
-  are unchecked. Not run on a unit.
+  are unchecked.
+- 1.1 on a unit (T153, 6 Nov 2026, Analog Rytm MKII, OS 1.74, core 0.10 +
+  analoghealth 1.3 + fx-sends 1.1): flashed over stock and back, the planned
+  tests passed, and in the listening check a sound with CHR up sounded fine
+  with the chorus and dry with CHR at 0. Not checked on the unit: trig-held
+  locks (they need the core fix), scene locks, performances, vel/AT, the LFO
+  on CHR, and the CPU load with the chorus on.
 - With core 0.3 (before the page tables), linked and run in the emulator with
   core, ae-pages, cpu-probe, duck and the
   rytm2_mods v1.2 mods minus comp-preview (which then conflicted with duck) and

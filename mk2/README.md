@@ -16,8 +16,8 @@ COMP with comp-preview 1.1 or later, through core's page-key lists.
 | folder | MK1 mod | what | status |
 |---|---|---|---|
 | [cpu-probe](cpu-probe/README.md) | 0011 | CPU, AUDIO and PEAK readouts on the CHANNELS page | hardware (1.0) |
-| [duck](duck/README.md) | 0012 | DUCK page behind COMP: VCA ducking keyed by a track; 1.1: kit, locks, FX LFO | 1.0 hardware; 1.1 linked only |
-| [fx-sends](fx-sends/README.md) | 0010 | a chorus send: CHR behind AMP; 1.1: CHORUS page behind DELAY, kit, locks, LFO, vel/AT | 1.0 hardware; 1.1 linked only |
+| [duck](duck/README.md) | 0012 | DUCK page behind COMP: VCA ducking keyed by a track; 1.1: kit, locks, FX LFO | 1.0 hardware; 1.1 emulator + unit (T153) |
+| [fx-sends](fx-sends/README.md) | 0010 | a chorus send: CHR behind AMP; 1.1: CHORUS page behind DELAY, kit, locks, LFO, vel/AT | 1.0 hardware; 1.1 emulator + unit (T153) |
 | [tx-machines](tx-machines/README.md) | 0009 | all seven machines (core-ar2 0.5) | emulator + hardware tested |
 
 "Hardware" means checked in rytm-emu and then on an Analog Rytm MKII (OS 1.74,
@@ -26,7 +26,9 @@ was checked and what was not.
 
 **Core 0.10** (6 Nov 2026): all four build with elekloader main (7d0bf15) and
 link with core-ar2 0.10 on stock 1.74 (the builds below). duck 1.1 and
-fx-sends 1.1 have not run yet, in an emulator or on a unit.
+fx-sends 1.1 ran in the emulator and then on a unit (T153, 6 Nov 2026), each
+in its own build with analoghealth 1.3; both passed the planned tests and the
+listening check. Trig-held locks need a core-ar2 fix that is handed over.
 
 | build on core 0.10 | links |
 |---|---|
