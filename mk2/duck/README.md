@@ -41,6 +41,9 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
+- Core 0.10 (6 Nov 2026): builds and links unchanged, alone, with
+  comp-preview 1.1 and with all eleven rytm2_mods mods (mk2/README.md); not
+  yet run on 0.10.
 
 ## Status
 

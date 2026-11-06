@@ -58,6 +58,10 @@ They agree within the recordings' accuracy, so nothing is retuned.
 
 ## Status
 
+**Core 0.10** (6 Nov 2026): 0.3 builds and links unchanged with core-ar2
+0.10, alone, with the other AE ports and with all eleven rytm2_mods mods
+(mk2/README.md); not yet run on 0.10. It needs core 0.5 or later.
+
 **0.2 (the five new machines), emulator** (rytm-emu, OS 1.74, 24 Oct 2026,
 build TX8A = stock 1.74 + core-ar2 0.5 + this mod at 994b045): each machine is
 listed only on its tracks (the toms on LT, MT and HT, as on the MK1); the SRC

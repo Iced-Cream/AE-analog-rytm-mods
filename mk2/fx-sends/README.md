@@ -61,10 +61,14 @@ the tail has died (about 3 s).
 ## Needs and conflicts
 
 - Needs core-ar2 0.4 (its page tables).
-- Uses 7 bits of core-ar2's 56-bit sound storage. voice-dac (39) and lfo-rnd
-  (16) use 55, so **fx-sends cannot be in a build with both of them**; the
-  patcher refuses that build ("the mods need 62 bits of sound storage"). It
-  links with either one of them.
+- Uses 7 bits of core-ar2's 56-bit sound storage. voice-dac 1.4 (39) and
+  lfo-rnd 1.2 (16) use 55; voice-dac 1.5 (32), lfo-rnd 1.3 (16) and core
+  0.10's LFO destination field (7) use 55 too. So **fx-sends cannot be in a
+  build with both of them**; the patcher refuses that build ("the mods need
+  62 bits of sound storage"). It links with either one of them (core 0.10:
+  30 bits with lfo-rnd 1.3, 46 with voice-dac 1.5).
+- Core 0.10 (6 Nov 2026): builds and links unchanged, alone and with the
+  rytm2_mods mods (mk2/README.md); not yet run on 0.10.
 - With core 0.3 (before the page tables), linked and run in the emulator with
   core, ae-pages, cpu-probe, duck and the
   rytm2_mods v1.2 mods minus comp-preview (which then conflicted with duck) and
