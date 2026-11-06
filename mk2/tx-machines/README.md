@@ -221,7 +221,10 @@ formula itself. t9sd_ptc is refitted to the MD's pitches on the MKII, and
 the digital fifth adds SD CLASSIC's offset and 16 cents for the MD's ratio
 (tools/gen_tx_tables.py --mk2-s9t / --mk2-s9f). SD TX-8 carries the same
 SD CLASSIC offset (+41..+43 cents over the MD at PTC 0 / 64), so its
-TX8SD_TUNOFF drops it too. Not yet on a unit.
+TX8SD_TUNOFF drops it too. On the unit (T140, 6 Nov 2026, TX05H through
+the Sidecar mirror) SD TX-9 reads 122.6 / 183.2 / 243.8 Hz at PTC 0 / 64 /
+127 (MD 122.6 / 183.2 / 243.7), its fifth x1.484-1.488 (MD x1.484), and SD
+TX-8 125.1 / 250.1 Hz at PTC 0 / 64 (MD 124.8 / 249.6): all within 4 cents.
 
 **0.1 (BD TX-9, SD TX-9):**
 
