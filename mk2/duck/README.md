@@ -62,7 +62,9 @@ branch (31f87f1); the patched image verifies ("knob ids 555..559").
 - SRC's dial: a knob without a stock record is drawn on a 0..127 scale, so
   SRC keeps its position on that scale (`dk_acc`) and the source is that
   position * 13 / 128 (OFF at 0, CB at the top). A turn moves it about one
-  source a detent (delta * 10). To be re-checked in the emulator.
+  source a detent (delta * 10). Emulator: 13 detents give BD SD RS CP BT LT
+  MT HT CH OH CY CB then stop; the dial is at the left on OFF and full right
+  on CB; gain table unchanged (0f19b3b).
 - To do before this leaves draft: a unit run, and Connor's listening check.
 
 The status below is duck 1.0 on core 0.4.
