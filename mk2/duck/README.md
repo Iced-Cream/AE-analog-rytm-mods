@@ -26,23 +26,35 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 - **Key.** The source voice is read from the receive buffer `0x80007440` (12
   longs a frame, voice v in slot `0x401ef480[v]`). It is refilled later in the
   block, so DUCK sees the previous block's audio: one block (0.67 ms) late.
-- **Knobs.** The MKII has no spare "Error" records left once rytm2_mods is in,
-  so the knobs are the hidden HH TEST machine's records 443..447, renamed. At
-  the first UI tick their RAM records take the dial art and encoder feel of
-  COMP's MIX knob. The settings keep 8.8 fractions, as stock does, so turns
-  smaller than a step add up.
+- **Knobs.** Mod-kept ids 580..584 (core-ar2 0.12), with no stock record
+  behind them: `core_params` gives each knob's value, step and text, and
+  `core_param_locks` its label and name (a lock with a trig held is none: the
+  settings are global). Until duck 1.0 they were HH TEST's records 443..447;
+  core 0.12 gives HH TEST (slot 50) to mod machines, so those records are
+  no longer free. The settings keep 8.8 fractions, as stock does, so turns
+  smaller than a step add up. Ids 580..584 are duck's within the 0.12 rebuilds
+  (fx-sends 585..592).
 - **Page.** Page 14, after COMP (page 11) in the COMP view's list, through
   core-ar2 0.4's page tables (`core_pages`, `core_params`) and page-key
   lists (`core_view_pages`, order 30: after comp-preview's preview).
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.4 (its page tables).
+- Needs core-ar2 0.12 (mod-kept ids on a page without a record; 1.0 needs 0.4 to 0.11).
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
 
 ## Status
+
+**1.1 (core 0.12): assembled only.** duck.s assembles; it has not been linked,
+run in the emulator or run on a unit (needs the stock OS 1.74 image, which the
+cloud build has no copy of). To do before this leaves draft: link against
+core-0.12.elemod, an emulator pass with the same table below, a unit run, and
+Connor's listening check. Not known yet: how core draws a pseudo-id knob's dial
+and range (SRC's 0..12 may show on a 0..127 dial).
+
+The status below is duck 1.0 on core 0.4.
 
 - Emulator (rytm-emu), core 0.4 + all eleven rytm2_mods mods (comp-preview
   1.1 included) + duck + cpu-probe: the COMP key steps COMP, preview, DUCK.
