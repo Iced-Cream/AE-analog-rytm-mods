@@ -197,14 +197,10 @@ dk_get:
         move.l  4(%sp),%d0
         bsr.w   knob_of
         bmi.s   9f
-        bne.s   3f
-        lea     dk_acc,%a0                        | SRC: its dial position, 8.8
-        mvz.w   (%a0),%d0
-        bra.s   4f
-3:      lea     dk_set,%a0
+        lea     dk_set,%a0
         mvz.b   (%a0,%d0.l),%d0
         lsl.l   #8,%d0
-4:      move.l  8(%sp),%a0
+        move.l  8(%sp),%a0
         move.l  %d0,(%a0)
         moveq   #1,%d0
         rts
@@ -221,17 +217,7 @@ dk_delta:
         move.l  %d0,%a1                           | the knob
         lea     dk_acc,%a0
         mvz.w   (%a0,%d0.l*2),%d0
-        move.l  %a1,%d1
-        bne.s   3f
-        move.l  12(%sp),%d1                       | SRC: 13 sources on a 0..127 dial,
-        move.l  %d1,%a0                           | so a detent is about one source:
-        lsl.l   #3,%d1                            | delta * 10
-        add.l   %a0,%d1
-        add.l   %a0,%d1
-        add.l   %d1,%d0
-        bra.s   4f
-3:      add.l   12(%sp),%d0
-4:      tst.l   %d0
+        add.l   12(%sp),%d0
         bpl.s   1f
         clr.l   %d0
 1:      lea     knob_max,%a0
@@ -243,16 +229,7 @@ dk_delta:
 2:      lea     dk_acc,%a0
         move.w  %d0,(%a0,%a1.l*2)
         lsr.l   #8,%d0
-        move.l  %a1,%d1
-        bne.s   5f
-        move.l  %d0,%a0                           | SRC: position 0..127 -> 0..12,
-        move.l  %d0,%d1                           | position * 13 >> 7
-        lsl.l   #3,%d0
-        add.l   %a0,%d0
-        lsl.l   #2,%d1
-        add.l   %d1,%d0
-        lsr.l   #7,%d0
-5:      lea     dk_set,%a0
+        lea     dk_set,%a0
         move.b  %d0,(%a0,%a1.l)
         moveq   #1,%d0
         rts
@@ -351,7 +328,32 @@ dk_zero:
         | ==================================================================
         | Data
         | ==================================================================
+        | The knobs' looks, through core_knob_looks (core-ar2 0.12): COMP's MIX
+        | knob (stock id 191, which duck 1.0's records copied) for all five. SRC's
+        | UI record is MIX's with its range (+8) 0..12, built at the first call.
+        .equ    LOOK_MIX,       191
+        .align  2
+dk_src_ui:
+        lea     dk_ui,%a0
+        tst.l   (%a0)
+        bne.s   9f
+        move.l  #LOOK_MIX,-(%sp)
+        jsr     core_knob_stock_ui                | the UI record, in %a0
+        addq.l  #4,%sp
+        lea     dk_ui,%a1
+        moveq   #21,%d1                           | 84 bytes
+1:      move.l  (%a0)+,(%a1)+
+        subq.l  #1,%d1
+        bne.s   1b
+        lea     dk_ui,%a0
+        move.l  #12<<8,%d1
+        move.l  %d1,8(%a0)
+9:      lea     dk_ui,%a0
+        move.l  %a0,%d0
+        rts
+
         .align  4
+dk_ui:          .space  84
         .globl  duck_view_page
 duck_view_page: .long   8, PAGE_DUCK, 0           | core_view_pages: CORE_VIEW_COMP, always shown
         .globl  duck_page, duck_params
@@ -361,11 +363,14 @@ duck_page:      .long   PAGE_DUCK, str_page       | core_pages: {page, name, A..
 duck_params:    .long   ID0, ID0+KNOBS-1, dk_get, dk_delta, dk_text  | core_params
                 .globl  duck_locks
 duck_locks:     .long   ID0, ID0+KNOBS-1, dk_none, dk_none, dk_zero, dk_zero, dk_label, dk_name
+duck_looks_src: .long   ID0, ID0, LOOK_MIX, dk_src_ui, 0, 12<<8      | core_knob_looks
+                .globl  duck_looks_src, duck_looks
+duck_looks:     .long   ID0+1, ID0+KNOBS-1, LOOK_MIX, 0, 0, 127<<8
 lbl_tab:        .long   duck_str_src, duck_str_dep, duck_str_atk, duck_str_hld, duck_str_rel
 name_tab:       .long   duck_str_src_l, duck_str_dep_l, duck_str_atk_l, duck_str_hld_l, duck_str_rel_l
 dk_state:       .long   0, 0, 1                   | env, hold, armed
 dk_acc:         .short  0, 90<<8, 3<<8, 22<<8, 36<<8  | the settings in 8.8
-knob_max:       .byte   127, 127, 127, 127, 127   | SRC: the dial's 0..127; the source is 13 steps of it
+knob_max:       .byte   12, 127, 127, 127, 127
 dk_set:         .byte   0, 90, 3, 22, 36          | SRC DEP ATK HLD REL (defaults)
 src_voice:      .byte   0, 2, 7, 7, 1, 3, 5, 5, 4, 4, 6, 6  | BD SD RS CP BT LT MT HT CH OH CY CB
         | physical voice -> its receive-buffer offset, +8 + 4 * slot, from the

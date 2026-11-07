@@ -8,7 +8,7 @@ With the FX track selected, press AMP (COMP) a second time for the DUCK page:
 
 | knob | range | what |
 |---|---|---|
-| SRC | OFF, BD SD RS CP BT LT MT HT CH OH CY CB (13 steps over the dial) | the key track |
+| SRC | OFF, BD SD RS CP BT LT MT HT CH OH CY CB | the key track |
 | DEP | 0..127 | depth: 127 pulls the other voices fully down (90 is about -10 dB) |
 | ATK | 0..127 | attack, instant to about 85 ms (time constant) |
 | HLD | 0..127 | hold at full depth after a hit, 0 to 170 ms |
@@ -39,7 +39,7 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.12 (mod-kept ids on a page without a record; 1.0 needs 0.4 to 0.11).
+- Needs core-ar2 0.12 with knob looks (mod-kept ids on a page without a record; 1.0 needs 0.4 to 0.11).
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
@@ -59,12 +59,11 @@ branch (31f87f1); the patched image verifies ("knob ids 555..559").
   name as C functions and reads the pointer from %a0; duck returned it in %d0
   only). With the fix (9fd1ac4) the labels read SRC DEP ATK HLD REL and the
   header DUCK SOURCE .. DUCK RELEASE; gain table unchanged.
-- SRC's dial: a knob without a stock record is drawn on a 0..127 scale, so
-  SRC keeps its position on that scale (`dk_acc`) and the source is that
-  position * 13 / 128 (OFF at 0, CB at the top). A turn moves it about one
-  source a detent (delta * 10). Emulator: 13 detents give BD SD RS CP BT LT
-  MT HT CH OH CY CB then stop; the dial is at the left on OFF and full right
-  on CB; gain table unchanged (0f19b3b).
+- Knob looks (core 0.12 `core_knob_looks`): all five knobs take COMP MIX's
+  look (stock id 191, which 1.0's records copied): its dial art and encoder
+  steps, DEP..REL on 0..127 and SRC on 0..12 (SRC's UI record is MIX's with
+  +8 = 12<<8, built at the first call). 1.1 is a plain 0..12 SRC again, as 1.0.
+  To be checked in the emulator on the core with knob looks (2afb6d9f...).
 - To do before this leaves draft: a unit run, and Connor's listening check.
 
 The status below is duck 1.0 on core 0.4.
