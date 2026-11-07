@@ -37,8 +37,10 @@
         | into chr_trk, and an edit updates its track's entry at once.
         |
         | The page: page 15 after AMP (page 7) in the AMP view's list, through
-        | core-ar2 0.4's page tables. Its knobs are CY TEST's parameter records 449..456 (a hidden
-        | machine's, renamed).
+        | core-ar2 0.4's page tables. Its knobs are ids 585..592, kept by the mod itself
+        | through core-ar2 0.11's core_params and core_param_locks (a label and a name
+        | for each); they use no machine's parameter records (core 0.12 gives the TEST
+        | machines' slots 44..52 to mod machines).
         |
         | Memory: the line and buffers are this mod's .bss (8.5 KB), not raw DRAM.
         |
@@ -46,7 +48,7 @@
 
         .equ    PAGE_AMP,       7
         .equ    PAGE_FX,        15
-        .equ    ID0,            449               | CHR PRE SPD DEP WID FDB HPF VOL: 449..456
+        .equ    ID0,            585               | CHR PRE SPD DEP WID FDB HPF VOL: 585..592 (mod-kept ids)
         .equ    KNOBS,          8
 
         .equ    TRACKS,         12
@@ -699,40 +701,31 @@ put_u3:
         move.l  (%sp)+,%d1
         rts
 
+        | const char *label(long id), *name(long id): core_param_locks' knob label
+        | (4 characters) and the header's name, 0 for an id that is not ours
+        .align  2
+fs_label:
+        lea     label_tab,%a1
+        bra.s   1f
+fs_name:
+        lea     name_tab,%a1
+1:      move.l  4(%sp),%d0
+        bsr.w   knob_of
+        bmi.s   2f
+        move.l  (%a1,%d0.l*4),%d0
+        rts
+2:      moveq   #0,%d0
+        rts
+
         | ==================================================================
         | The UI tick and the project
         | ==================================================================
 
-        | ev_tick: once, the eight knobs' RAM records (built at boot from the
-        | records patched in mod.json) take a stock dial's encoder feel and
-        | its dial art, from COMP's MIX (id 94, 0..127). Every tick, each
-        | track's CHR into chr_trk, which the audio reads.
-        .equ    PARAM_INFO,     0x419a4888        | RAM records, 0x54 bytes an id
-        .equ    PI_STRIDE,      0x54
-        .equ    PI_DRAW,        0x24              | the draw callback, 16 B
-        .equ    ID_DONOR,       94
+        | ev_tick: each track's CHR into chr_trk, which the audio reads.
         .globl  fx_sends_tick
         .align  2
 fx_sends_tick:
-        lea     ready,%a0
-        tst.b   (%a0)
-        bne.s   5f
-        moveq   #1,%d0
-        move.b  %d0,(%a0)
-        lea     PARAM_INFO+ID_DONOR*PI_STRIDE,%a0
-        lea     PARAM_INFO+ID0*PI_STRIDE,%a1
-        moveq   #KNOBS,%d0
-1:      move.l  4(%a0),4(%a1)                     | the encoder's range, 8.8
-        move.l  8(%a0),8(%a1)
-        move.l  16(%a0),16(%a1)                   | its acceleration
-        move.l  PI_DRAW(%a0),PI_DRAW(%a1)         | the dial art
-        move.l  PI_DRAW+4(%a0),PI_DRAW+4(%a1)
-        move.l  PI_DRAW+8(%a0),PI_DRAW+8(%a1)
-        move.l  PI_DRAW+12(%a0),PI_DRAW+12(%a1)
-        lea     PI_STRIDE(%a1),%a1
-        subq.l  #1,%d0
-        bne.s   1b
-5:      move.l  %d2,-(%sp)
+        move.l  %d2,-(%sp)
         moveq   #0,%d2
 6:      move.l  %d2,%d0
         bsr.w   accessor_of
@@ -771,20 +764,25 @@ fx_sends_page:  .long   PAGE_FX, str_page         | core_pages: {page, name, A..
                 .long   ID0, ID0+1, ID0+2, ID0+3
                 .long   ID0+4, ID0+5, ID0+6, ID0+7
 fx_sends_params: .long  ID0, ID0+KNOBS-1, fs_get, fs_delta, fs_text  | core_params
+        .globl  fx_sends_locks
+        | core_param_locks: no locks kept (get, turn, set, clear 0 answer none), the
+        | label and name for the ids
+fx_sends_locks: .long   ID0, ID0+KNOBS-1, 0, 0, 0, 0, fs_label, fs_name
+label_tab:      .long   fx_sends_str_chr, fx_sends_str_pre, fx_sends_str_spd, fx_sends_str_dep
+                .long   fx_sends_str_wid, fx_sends_str_fdb, fx_sends_str_hpf, fx_sends_str_vol
+name_tab:       .long   fx_sends_str_chr_l, fx_sends_str_pre_l, fx_sends_str_spd_l, fx_sends_str_dep_l
+                .long   fx_sends_str_wid_l, fx_sends_str_fdb_l, fx_sends_str_hpf_l, fx_sends_str_vol_l
 acc:            .short  0, 40<<8, 24<<8, 64<<8, 96<<8, 0, 0, 100<<8  | the globals in 8.8
 globals:        .byte   40, 24, 64, 96, 0, 0, 100 | PRE SPD DEP WID FDB HPF VOL (defaults)
-ready:          .byte   0
 chr_frac:       .byte   0, 0xff                   | CHR's fraction, and its track
         | physical voice -> its receive-buffer offset, +8 + 4 * slot, from the
         | stock map 0x401ef480 (0, 3, 1, 4, 6, 5, 7, 2)
 slot_off:       .byte   8, 20, 12, 24, 32, 28, 36, 16
-        .globl  fx_sends_str_group
         .globl  fx_sends_str_chr_l, fx_sends_str_pre_l, fx_sends_str_spd_l, fx_sends_str_dep_l
         .globl  fx_sends_str_wid_l, fx_sends_str_fdb_l, fx_sends_str_hpf_l, fx_sends_str_vol_l
         .globl  fx_sends_str_chr, fx_sends_str_pre, fx_sends_str_spd, fx_sends_str_dep
         .globl  fx_sends_str_wid, fx_sends_str_fdb, fx_sends_str_hpf, fx_sends_str_vol
 str_page:       .asciz  "SEND"                    | the page title shows 4 characters
-fx_sends_str_group: .asciz "FX SENDS"
 fx_sends_str_chr_l: .asciz "Chorus Send"
 fx_sends_str_pre_l: .asciz "Chorus Pre-Delay"
 fx_sends_str_spd_l: .asciz "Chorus Speed"

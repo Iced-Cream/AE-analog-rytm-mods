@@ -50,17 +50,20 @@ the tail has died (about 3 s).
   kept without a kit save.
 - **Memory.** The line and buffers (8.5 KB) are this mod's `.bss`, not raw
   DRAM, so there is no clearing pass after boot.
-- **Knobs.** The hidden CY TEST machine's parameter records 449..456, renamed.
-  At the first UI tick their RAM records take the dial art and encoder feel of
-  COMP's MIX knob (as duck does). The global settings keep 8.8 fractions; CHR
-  keeps one fraction, for the track it was last turned on.
+- **Knobs.** Mod-kept parameter ids 585..592 (from core-ar2's
+  `CORE_PARAM_LOCK_FIRST` 555 up), answered through `core_params` and named by a
+  `core_param_locks` entry (label and name only; no locks are kept). Until 1.0
+  they were the hidden CY TEST machine's records 449..456; core-ar2 0.12 offers
+  that machine's slot (51) to mod machines, so this mod no longer touches those
+  records and declares no `machine:51`. The global settings keep 8.8 fractions;
+  CHR keeps one fraction, for the track it was last turned on.
 - **Page.** Page 15, after AMP (page 7) in the AMP view's list, through
   core-ar2 0.4's page tables (`core_pages`, `core_params`) and page-key lists
   (`core_view_pages`, order 30).
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.4 (its page tables).
+- Needs core-ar2 0.12 (declared `"core": "0.12"`): its page tables and mod-kept ids.
 - Uses 7 bits of core-ar2's 56-bit sound storage. voice-dac (39) and lfo-rnd
   (16) use 55, so **fx-sends cannot be in a build with both of them**; the
   patcher refuses that build ("the mods need 62 bits of sound storage"). It
@@ -71,6 +74,15 @@ the tail has died (about 3 s).
   minus lfo-rnd or voice-dac. It also linked with comp-preview when duck was left out.
 
 ## Status
+
+**1.1 (core 0.12): built from source only, not yet built, run in the emulator or
+tried on a unit.** The knob move (CY TEST records 449..456 to ids 585..592) is
+untested; to check in the emulator: the page shows with the same labels and
+header names, every knob turns over 0..127 with the feel it had (the knobs no
+longer copy COMP MIX's dial art and encoder feel into a record, so the draw and
+turn rate come from stock's fallback for an id above 468 and may differ), CHR is
+kept with the sound, and the chorus output is byte-identical to 1.0. The notes
+below describe 1.0.
 
 Emulator (rytm-emu), core 0.4 + fx-sends, and core 0.4 with the rytm2_mods mods
 (all but lfo-rnd, so with voice-dac 1.3 and comp-preview) and cpu-probe: the
