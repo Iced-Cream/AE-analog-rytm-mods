@@ -115,8 +115,11 @@
         .equ    ST_CDIV,        36                | blocks until coefs_build runs again
         .equ    ST_ANY,         40                | its last result: a track sends
         .equ    ST_COEF,        44                | per voice: chorus coefficient (Q31)
-        .equ    ST_ACT,         76                | per sending voice: rx offset, coefficient
-        .equ    ST_SIZE,        140
+        .equ    ST_TGT,         76                | per voice: its target, from CHR
+        .equ    ST_S1,          108               | per voice: the first glide stage
+        .equ    ST_ACT,         140               | per sending voice: rx offset,
+                                                  | coefficient, its step a frame
+        .equ    ST_SIZE,        236
         .equ    COEF_K,         66572             | v^2 * K: v 127 -> 0.5 in Q31
 
         | the live sound, through the selected track's accessor
@@ -165,16 +168,22 @@ fx_sends_fx_gate:
         move.l  #0xa0,%macsr                      | as the stock FX: fractional, saturating
         lea     st,%a6
 
-        | the send coefficients, from each voice's owning track, every 8th
-        | block (5 ms): they glide anyway, and the walk over the voices is the
-        | mod's one cost while nothing sends
+        | the send targets, from each voice's owning track, every 8th block
+        | (5 ms; chr_read refreshes a voice every 8th block too); the walk
+        | over the voices is the mod's one cost while nothing sends. The
+        | coefficients glide toward them every block while any send is on or
+        | still settling, and ramp sample by sample inside the block.
         subq.l  #1,ST_CDIV(%a6)
         bpl.s   11f
         moveq   #7,%d0
         move.l  %d0,ST_CDIV(%a6)
         bsr.w   coefs_build                       | d0 = non-zero if any send
         move.l  %d0,ST_ANY(%a6)
-11:     tst.l   ST_ANY(%a6)
+11:     move.l  ST_ANY(%a6),%d0
+        or.l    ST_NACT(%a6),%d0
+        beq.s   12f
+        bsr.w   coefs_glide
+12:     tst.l   ST_ANY(%a6)
         beq.s   2f
         move.l  #TAIL_BLOCKS,%d0
         move.l  %d0,ST_TAIL(%a6)
@@ -374,20 +383,16 @@ cho_read:
 
         | ------------------------------------------------------------------
         | coefs_build(a6 = st) -> d0 non-zero if any track sends. Per physical
-        | voice, its owning track's CHR (chr_trk); the coefficients glide a
-        | quarter of the way a block (no zipper), and the voices with one
-        | non-zero go into the active list. Clobbers d0-d7/a0-a4.
+        | voice, its owning track's CHR (chr_trk) as a target coefficient,
+        | CHR^2 * K. Clobbers d0-d7/a0-a4.
         | ------------------------------------------------------------------
         .align  2
 coefs_build:
         moveq   #0,%d7                            | any target
         moveq   #0,%d6                            | voice
-        lea     ST_COEF(%a6),%a2
-        lea     ST_ACT(%a6),%a3
-        clr.l   ST_NACT(%a6)
+        lea     ST_TGT(%a6),%a2
         lea     VOICE_OWNER,%a4
         lea     chr_trk,%a1
-        lea     slot_off,%a0
 1:      moveq   #0,%d4                            | target
         mvz.b   (%a4,%d6.l),%d0
         moveq   #TRACKS-1,%d1
@@ -398,27 +403,69 @@ coefs_build:
         move.l  #COEF_K,%d4
         mulu.l  %d1,%d4
         or.l    %d4,%d7
-3:      move.l  (%a2),%d0                         | glide
-        sub.l   %d0,%d4
-        asr.l   #2,%d4
-        add.l   %d4,%d0
-        cmp.l   #0x10000,%d0
-        bcc.s   4f
+3:      move.l  %d4,(%a2)+
+        addq.l  #1,%d6
+        moveq   #VOICES,%d0
+        cmp.l   %d0,%d6
+        bne.s   1b
+        move.l  %d7,%d0
+        rts
+
+        | ------------------------------------------------------------------
+        | coefs_glide(a6 = st) -> d0 = sending voices. Each voice's coefficient
+        | follows its target through two one-pole stages, an eighth of the way
+        | a block each (no zipper when an LFO or a lock moves CHR fast: the
+        | targets step every 8th block), and settles to zero once the target
+        | is zero and both stages are tiny. The voices with a coefficient at
+        | either end of the block go into the active list with the block-start
+        | value and a per-frame step, so buses_mix ramps it sample by sample.
+        | Clobbers d0-d6/a0-a4.
+        | ------------------------------------------------------------------
+        .align  2
+coefs_glide:
+        moveq   #0,%d6                            | voice
+        lea     ST_TGT(%a6),%a1
+        lea     ST_S1(%a6),%a2
+        lea     ST_COEF(%a6),%a4
+        lea     ST_ACT(%a6),%a3
+        clr.l   ST_NACT(%a6)
+        lea     slot_off,%a0
+1:      move.l  (%a1)+,%d4                        | target
+        move.l  (%a2),%d1                         | s1 += (target - s1) / 8
+        move.l  %d4,%d0
+        sub.l   %d1,%d0
+        asr.l   #3,%d0
+        add.l   %d0,%d1
+        move.l  (%a4),%d2                         | the coefficient now
+        move.l  %d1,%d3                           | new = c + (s1 - c) / 8
+        sub.l   %d2,%d3
+        asr.l   #3,%d3
+        add.l   %d2,%d3
         tst.l   %d4
-        bgt.s   4f
-        clr.l   %d0                               | settled at zero
-4:      move.l  %d0,(%a2)+
-        tst.l   %d0
+        bne.s   2f
+        cmp.l   #0x10000,%d1                      | target zero: settle once
+        bcc.s   2f                                | both stages are tiny
+        cmp.l   #0x10000,%d3
+        bcc.s   2f
+        clr.l   %d1
+        clr.l   %d3
+2:      move.l  %d1,(%a2)+
+        move.l  %d3,(%a4)+
+        move.l  %d2,%d0
+        or.l    %d3,%d0
         beq.s   6f
-        mvz.b   (%a0,%d6.l),%d1                   | active: rx offset, coefficient
-        move.l  %d1,(%a3)+
+        mvz.b   (%a0,%d6.l),%d0                   | active: rx offset,
         move.l  %d0,(%a3)+
+        move.l  %d2,(%a3)+                        | the coefficient at frame 0,
+        sub.l   %d2,%d3
+        asr.l   #5,%d3                            | its step a frame (FRAMES 32)
+        move.l  %d3,(%a3)+
         addq.l  #1,ST_NACT(%a6)
 6:      addq.l  #1,%d6
         moveq   #VOICES,%d0
         cmp.l   %d0,%d6
         bne.s   1b
-        move.l  %d7,%d0
+        move.l  ST_NACT(%a6),%d0
         rts
 
         | ------------------------------------------------------------------
@@ -436,10 +483,12 @@ buses_mix:
         lea     ST_ACT(%a6),%a4
         move.l  (%a4)+,%d3
         move.l  (%a4)+,%d1                        | the coefficient
+        move.l  (%a4)+,%d2                        | its step a frame
         add.l   %d3,%a5
 4:      move.l  (%a5),%d0
         lea     RX_STRIDE(%a5),%a5
         mac.l   %d1,%d0,%acc0
+        add.l   %d2,%d1
         movclr.l %acc0,%d3
         move.l  %d3,(%a0)+
         subq.l  #1,%d6
@@ -449,9 +498,12 @@ buses_mix:
         move.l  ST_NACT(%a6),%d5
         beq.s   3f
 2:      move.l  (%a4)+,%d3                        | rx offset
-        move.l  (%a4)+,%d1                        | the coefficient
+        move.l  (%a4),%d1                         | the coefficient
         move.l  (%a5,%d3.l),%d0                   | the voice's sample
         mac.l   %d1,%d0,%acc0
+        add.l   4(%a4),%d1                        | ramped a frame on
+        move.l  %d1,(%a4)
+        addq.l  #8,%a4
         subq.l  #1,%d5
         bne.s   2b
 3:      movclr.l %acc0,%d0
