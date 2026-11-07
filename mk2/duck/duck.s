@@ -27,7 +27,7 @@
         | once the voice fell below -48 dBFS since the last one.
         |
         | The page: page 14 after COMP (page 11) in the COMP view's list, through
-        | core-ar2's page tables. Its knobs are mod-kept ids 580..584 (core-ar2
+        | core-ar2's page tables. Its knobs are mod-kept ids, "knobs": 5 (core-ar2
         | 0.12): core_params gives their values and text, core_param_locks their
         | labels and names, and no stock record is behind them (HH TEST, slot 50,
         | is a machine slot a mod may take from 0.12). The COMP view's page list is also what
@@ -35,7 +35,7 @@
 
         .equ    PAGE_COMP,      11
         .equ    PAGE_DUCK,      14
-        .equ    ID0,            580               | SRC DEP ATK HLD REL: 580..584
+        .equ    ID0,            __knobs           | SRC DEP ATK HLD REL: __knobs + 0..4 (mod.json "knobs": 5)
 
         .equ    VCA_FN,         0x40109940
         .equ    RXBUF,          0x80007440

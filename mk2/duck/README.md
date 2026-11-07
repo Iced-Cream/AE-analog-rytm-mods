@@ -26,14 +26,13 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 - **Key.** The source voice is read from the receive buffer `0x80007440` (12
   longs a frame, voice v in slot `0x401ef480[v]`). It is refilled later in the
   block, so DUCK sees the previous block's audio: one block (0.67 ms) late.
-- **Knobs.** Mod-kept ids 580..584 (core-ar2 0.12), with no stock record
+- **Knobs.** Mod-kept ids (core-ar2 0.12; `"knobs": 5`, the linker's `__knobs` + 0..4: 555..559 alone in a build, other ids beside other mods), with no stock record
   behind them: `core_params` gives each knob's value, step and text, and
   `core_param_locks` its label and name (a lock with a trig held is none: the
   settings are global). Until duck 1.0 they were HH TEST's records 443..447;
   core 0.12 gives HH TEST (slot 50) to mod machines, so those records are
   no longer free. The settings keep 8.8 fractions, as stock does, so turns
-  smaller than a step add up. Ids 580..584 are duck's within the 0.12 rebuilds
-  (fx-sends 585..592).
+  smaller than a step add up.
 - **Page.** Page 14, after COMP (page 11) in the COMP view's list, through
   core-ar2 0.4's page tables (`core_pages`, `core_params`) and page-key
   lists (`core_view_pages`, order 30: after comp-preview's preview).
@@ -47,10 +46,10 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 
 ## Status
 
-**1.1 (core 0.12): assembled only.** duck.s assembles; it has not been linked,
-run in the emulator or run on a unit (needs the stock OS 1.74 image, which the
-cloud build has no copy of). To do before this leaves draft: link against
-core-0.12.elemod, an emulator pass with the same table below, a unit run, and
+**1.1 (core 0.12): built and linked, not run.** duck.s builds and links with
+core-0.12.elemod (sha256 8b949bff...) on elekloader's core-ar2-0.12-knobs
+branch; the patched image verifies. It has not run in the emulator or on a
+unit. To do before this leaves draft: an emulator pass with the same table below, a unit run, and
 Connor's listening check. Not known yet: how core draws a pseudo-id knob's dial
 and range (SRC's 0..12 may show on a 0..127 dial).
 
