@@ -114,9 +114,24 @@ the tail has died (about 3 s).
   a new kit starts with the chorus settings and CHR at their defaults, and
   PRE 100 and CHR 100 are kept after saving the project, loading another and
   coming back. Listening check: BD at CHR 100 sounded fine with the chorus,
-  and dry at CHR 0. Not checked on the unit: locks of any kind (trig-held
-  ones need the core fix), scene locks, performances, the LFO and vel/AT on
-  CHR, NRPN, the fields over a power-off, and the CPU load with the chorus on.
+  and dry at CHR 0.
+- 1.1 on a unit, second run (T156, 7 Nov 2026, same build), each step checked
+  on screen and the engine's values read back: CHR and PRE by NRPN; the sound
+  LFO on CHR sweeps it; the velocity and aftertouch routes to CHR reach it
+  (velocity 1 -> 1, 127 -> 126; aftertouch 0/127/0 -> 1/127/1); a CHR lock
+  and a PRE lock recorded live by CC play on their own steps only; CHR 77
+  and PRE 88 survive a power cycle without a save. CPU on the unit: 79% idle;
+  about 89% with the chorus on one track; 97.7% with it on BD, SD and CH
+  (stats, at the edge of the 98% limit). Listening: the live CHR lock was
+  heard on its step only. With BD's LFO sweeping CHR, the owner heard some
+  distortion and clipping on the chorused kick hits. The dry kick (CHR 0) and
+  CHR 127 held were clean. On a held tone (T158, 7 Nov 2026), CHR 0, CHR 127
+  held, a slow full LFO sweep and the same sweep at half level were all clean.
+  So the send's modulation itself is clean, and the kick-pattern artefact is
+  not yet placed (the kick's transients through the chorus, or the CPU load
+  of that pattern). Not checked on the unit: trig-held locks (they need the
+  core fix), scene locks and performances (they fail in the emulator on core
+  0.10: the screen shows the lock, but the engine keeps the base value).
 - With core 0.3 (before the page tables), linked and run in the emulator with
   core, ae-pages, cpu-probe, duck and the
   rytm2_mods v1.2 mods minus comp-preview (which then conflicted with duck) and

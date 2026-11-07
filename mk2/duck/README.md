@@ -82,9 +82,16 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
   reading BD; a new kit starts with DUCK at its defaults, and SRC BD and
   HLD 60 are kept after saving the project, loading another and coming back.
   Listening check: with SRC BD and DEP 90 the snare ducked audibly after each
-  BD hit, and not with SRC OFF. Not checked on the unit: locks of any kind
-  (trig-held ones need the core fix), scene locks, performances, the FX LFO
-  on the DUCK fields, NRPN, and the fields over a power-off.
+  BD hit, and not with SRC OFF.
+- 1.1 on a unit, second run (T156, 7 Nov 2026, same build), each step checked
+  on screen and the engine's values read back: SRC and DEP by NRPN; the FX
+  LFO on DEP sweeps it 0..127, and the ducking depth was heard changing from
+  bar to bar; an FX LFO pointed at SRC leaves SRC alone (the LFO page shows
+  ERR); a DEP lock recorded live by CC plays on its own step only; SRC, DEP
+  and HLD survive a power cycle without a save. Idle CPU 79.5-80%. Not
+  checked on the unit: trig-held locks (they need the core fix), scene locks
+  and performances (they fail in the emulator on core 0.10: the screen shows
+  the lock, but the engine keeps the base value).
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
