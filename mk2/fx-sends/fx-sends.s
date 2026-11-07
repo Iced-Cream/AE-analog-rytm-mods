@@ -37,7 +37,7 @@
         | into chr_trk, and an edit updates its track's entry at once.
         |
         | The page: page 15 after AMP (page 7) in the AMP view's list, through
-        | core-ar2 0.4's page tables. Its knobs are ids 585..592, kept by the mod itself
+        | core-ar2 0.4's page tables. Its knobs are ids __knobs + 0..7 (the linker gives them, from 555 up), kept by the mod itself
         | through core-ar2 0.11's core_params and core_param_locks (a label and a name
         | for each); they use no machine's parameter records (core 0.12 gives the TEST
         | machines' slots 44..52 to mod machines).
@@ -48,7 +48,8 @@
 
         .equ    PAGE_AMP,       7
         .equ    PAGE_FX,        15
-        .equ    ID0,            585               | CHR PRE SPD DEP WID FDB HPF VOL: 585..592 (mod-kept ids)
+        .extern __knobs
+        .equ    ID0,            __knobs           | CHR PRE SPD DEP WID FDB HPF VOL: __knobs + 0..7 (linker-allocated knob ids)
         .equ    KNOBS,          8
 
         .equ    TRACKS,         12

@@ -50,8 +50,9 @@ the tail has died (about 3 s).
   kept without a kit save.
 - **Memory.** The line and buffers (8.5 KB) are this mod's `.bss`, not raw
   DRAM, so there is no clearing pass after boot.
-- **Knobs.** Mod-kept parameter ids 585..592 (from core-ar2's
-  `CORE_PARAM_LOCK_FIRST` 555 up), answered through `core_params` and named by a
+- **Knobs.** Eight mod-kept parameter ids, allocated by the linker (`"knobs": 8`
+  in mod.json; the first is the symbol `__knobs`, 555 or above, steady through
+  the lockfile; needs elekloader with the knob allocation, PR #11), answered through `core_params` and named by a
   `core_param_locks` entry (label and name only; no locks are kept). Until 1.0
   they were the hidden CY TEST machine's records 449..456; core-ar2 0.12 offers
   that machine's slot (51) to mod machines, so this mod no longer touches those
@@ -76,7 +77,7 @@ the tail has died (about 3 s).
 ## Status
 
 **1.1 (core 0.12): built from source only, not yet built, run in the emulator or
-tried on a unit.** The knob move (CY TEST records 449..456 to ids 585..592) is
+tried on a unit.** The knob move (CY TEST records 449..456 to `__knobs` + 0..7) is
 untested; to check in the emulator: the page shows with the same labels and
 header names, every knob turns over 0..127 with the feel it had (the knobs no
 longer copy COMP MIX's dial art and encoder feel into a record, so the draw and
