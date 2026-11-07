@@ -55,14 +55,14 @@ branch (31f87f1); the patched image verifies ("knob ids 555..559").
 - Gain curve, SRC = BD, DEP 90, ATK 3, HLD 22, REL 36, SD's VCA L word:
   identical to the 1.0 row below (12735, 3761, 3711, 4759, 6711, 9296, 11607,
   12675); with SRC OFF it stays 12735.
-- Labels and long names: first build failed (core calls label and name as C
-  functions and reads the pointer from %a0; duck returned it in %d0 only);
-  fixed, to be re-checked in the emulator.
+- Labels and long names: the first build drew garbage (core calls label and
+  name as C functions and reads the pointer from %a0; duck returned it in %d0
+  only). With the fix (9fd1ac4) the labels read SRC DEP ATK HLD REL and the
+  header DUCK SOURCE .. DUCK RELEASE; gain table unchanged.
 - Known: SRC is drawn on a 0..127 dial (CB, its top, points near the left
   end); the other four dials are right. A pseudo-id knob has no record to
   set the dial range.
-- To do before this leaves draft: the emulator re-check of the labels, a unit
-  run, and Connor's listening check.
+- To do before this leaves draft: a unit run, and Connor's listening check.
 
 The status below is duck 1.0 on core 0.4.
 
