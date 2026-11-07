@@ -8,7 +8,7 @@ With the FX track selected, press AMP (COMP) a second time for the DUCK page:
 
 | knob | range | what |
 |---|---|---|
-| SRC | OFF, BD SD RS CP BT LT MT HT CH OH CY CB | the key track |
+| SRC | OFF, BD SD RS CP BT LT MT HT CH OH CY CB (13 steps over the dial) | the key track |
 | DEP | 0..127 | depth: 127 pulls the other voices fully down (90 is about -10 dB) |
 | ATK | 0..127 | attack, instant to about 85 ms (time constant) |
 | HLD | 0..127 | hold at full depth after a hit, 0 to 170 ms |
@@ -59,9 +59,10 @@ branch (31f87f1); the patched image verifies ("knob ids 555..559").
   name as C functions and reads the pointer from %a0; duck returned it in %d0
   only). With the fix (9fd1ac4) the labels read SRC DEP ATK HLD REL and the
   header DUCK SOURCE .. DUCK RELEASE; gain table unchanged.
-- Known: SRC is drawn on a 0..127 dial (CB, its top, points near the left
-  end); the other four dials are right. A pseudo-id knob has no record to
-  set the dial range.
+- SRC's dial: a knob without a stock record is drawn on a 0..127 scale, so
+  SRC keeps its position on that scale (`dk_acc`) and the source is that
+  position * 13 / 128 (OFF at 0, CB at the top). A turn moves it about one
+  source a detent (delta * 10). To be re-checked in the emulator.
 - To do before this leaves draft: a unit run, and Connor's listening check.
 
 The status below is duck 1.0 on core 0.4.
