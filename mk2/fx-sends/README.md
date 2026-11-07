@@ -3,7 +3,7 @@
 FX SENDS, AE 0010, ported to the MKII as an elemod: a chorus as one more send
 effect, with the Analog Four chorus's controls.
 
-1.1 (core-ar2 0.10). On a drum track, press AMP a second time for the SEND
+1.2 (core-ar2 0.10; 1.1 with CHR's send gain ramped, below). On a drum track, press AMP a second time for the SEND
 page; on the FX track, press DELAY a second time for the CHORUS page:
 
 | page | knob | range | what | kept | locks, modulation |
@@ -132,6 +132,25 @@ the tail has died (about 3 s).
   of that pattern). Not checked on the unit: trig-held locks (they need the
   core fix), scene locks and performances (they fail in the emulator on core
   0.10: the screen shows the lock, but the engine keeps the base value).
+- The kick-pattern artefact, placed (T181, 7 Nov 2026, same build): it came
+  back with the kick at half level (so not clipping) and with a held tone at
+  the same fast sweep (BD's LFO: SPD 100, MUL x16, triangle, about 2.25 Hz),
+  and went away with the slow sweep; CPU read 91-93% with and without it. The
+  cause is in 1.1: the send's coefficient was rebuilt every 8th block and then
+  held for 256 samples, so a fast LFO on CHR stepped the send gain about 188
+  times a second (zipper). **1.2** moves the coefficient toward its target
+  every block and ramps it per sample within the block (`coefs_glide`,
+  `buses_mix`). A model of both puts the gain's largest per-sample jump at
+  0.115 (1.1) against 0.0007 (1.2), and the energy above 1 kHz about 50 dB
+  lower. In the emulator (analog-emu, chorus frozen) 1.1's gain is a staircase
+  8 blocks apart and 1.2's is smooth.
+- 1.2 on a unit (T182, 7 Nov 2026, core 0.10 + analoghealth 1.3 + fx-sends
+  1.1 then 1.2, recorded through ASIO): with the chorus frozen and the fast
+  sweep, 1.1's gain changes, folded by block phase, pile up in three of the
+  eight phases (max/median 1.67), and 1.2's are even (1.01). Energy above
+  1 kHz against the tone's band: the fast sweep adds 2.6 dB on 1.1 and 0.6 dB
+  on 1.2. The owner heard no distortion on 1.2 at the fast sweep. Idle CPU
+  read 86% on both builds that night (79% in earlier runs; not looked into).
 - With core 0.3 (before the page tables), linked and run in the emulator with
   core, ae-pages, cpu-probe, duck and the
   rytm2_mods v1.2 mods minus comp-preview (which then conflicted with duck) and
@@ -161,15 +180,8 @@ with the chorus on. With core's page step (no lfo-rnd in the build) the header
 names CHORUS SEND; with DAC SUM, the chorus and the preview together, the audio
 interrupt reads 92% and peaks at 94%, nothing audible.
 
-**1.1 not checked anywhere yet** (built and linked only): the two pages and
-their knobs, CHR's and the chorus settings' locks, scene locks, performances,
-LFO and routes, the CCs and NRPNs, the chorus settings kept through a kit save,
-a reload and a power cycle without a separate save (1.1 sends no kit change
-notice), that the borrowed ids 450..456 are kept from stock's FX setter on the
-FX track (core-ar2 0.9 says core does this), and the audio's cost of the reads
-(about 0.9% of a block for CHR's read with its routes, on a unit, and well
-under 1% for the seven in one call, by core-ar2's figures). It changes the
-sound path, so it waits for the owner's listening check too.
+1.1 and 1.2 were checked in the emulator and on a unit since; see the tests
+above (T153, T156, T158, T181, T182).
 
 **1.0, not checked on hardware:** the level of the return against the delay and
 reverb, and CHR surviving a kit save, a reload and a power
