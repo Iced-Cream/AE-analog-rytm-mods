@@ -703,7 +703,8 @@ put_u3:
         rts
 
         | const char *label(long id), *name(long id): core_param_locks' knob label
-        | (4 characters) and the header's name, 0 for an id that is not ours
+        | (4 characters) and the header's name, 0 for an id that is not ours; the
+        | pointer goes in both %d0 and %a0 (core calls these as C functions and reads %a0)
         .align  2
 fs_label:
         lea     label_tab,%a1
@@ -714,8 +715,10 @@ fs_name:
         bsr.w   knob_of
         bmi.s   2f
         move.l  (%a1,%d0.l*4),%d0
+        move.l  %d0,%a0                           | core reads the pointer from %a0
         rts
 2:      moveq   #0,%d0
+        sub.l   %a0,%a0
         rts
 
         | ==================================================================
