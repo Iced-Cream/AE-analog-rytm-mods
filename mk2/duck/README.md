@@ -46,12 +46,23 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 
 ## Status
 
-**1.1 (core 0.12): built and linked, not run.** duck.s builds and links with
-core-0.12.elemod (sha256 8b949bff...) on elekloader's core-ar2-0.12-knobs
-branch; the patched image verifies. It has not run in the emulator or on a
-unit. To do before this leaves draft: an emulator pass with the same table below, a unit run, and
-Connor's listening check. Not known yet: how core draws a pseudo-id knob's dial
-and range (SRC's 0..12 may show on a 0..127 dial).
+**1.1 (core 0.12): emulator checked on the PC, not run on a unit.** Built with
+core-0.12.elemod (sha256 8b949bff...) and elekloader's core-ar2-0.12-knobs
+branch (31f87f1); the patched image verifies ("knob ids 555..559").
+- Page: FX, AMP, AMP again shows DUCK with the five knobs on A..E.
+- Value text OFF/BD../127; turns clamp (SRC at CB and OFF, DEP and ATK at 127,
+  HLD at 0).
+- Gain curve, SRC = BD, DEP 90, ATK 3, HLD 22, REL 36, SD's VCA L word:
+  identical to the 1.0 row below (12735, 3761, 3711, 4759, 6711, 9296, 11607,
+  12675); with SRC OFF it stays 12735.
+- Labels and long names: first build failed (core calls label and name as C
+  functions and reads the pointer from %a0; duck returned it in %d0 only);
+  fixed, to be re-checked in the emulator.
+- Known: SRC is drawn on a 0..127 dial (CB, its top, points near the left
+  end); the other four dials are right. A pseudo-id knob has no record to
+  set the dial range.
+- To do before this leaves draft: the emulator re-check of the labels, a unit
+  run, and Connor's listening check.
 
 The status below is duck 1.0 on core 0.4.
 

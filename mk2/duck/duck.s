@@ -290,7 +290,8 @@ put_u3:
         | core_param_locks: the knobs' labels and names (a pseudo id has no
         | record to give them); a lock with a trig held is none: get and turn
         | answer -1, set and clear 0 (the settings are global, not per step).
-        | const char *label(long id), *name(long id): 0 for another's id.
+        | const char *label(long id), *name(long id): 0 for another's id. The pointer
+        | is returned in %a0 as well as %d0: core calls them as C functions.
         .align  2
 dk_label:
         move.l  4(%sp),%d0
@@ -298,8 +299,10 @@ dk_label:
         bmi.s   1f
         lea     lbl_tab,%a0
         move.l  (%a0,%d0.l*4),%d0
+        move.l  %d0,%a0                           | C returns pointers in a0
         rts
 1:      moveq   #0,%d0
+        sub.l   %a0,%a0
         rts
         .align  2
 dk_name:
@@ -308,8 +311,10 @@ dk_name:
         bmi.s   1f
         lea     name_tab,%a0
         move.l  (%a0,%d0.l*4),%d0
+        move.l  %d0,%a0                           | C returns pointers in a0
         rts
 1:      moveq   #0,%d0
+        sub.l   %a0,%a0
         rts
         .align  2
 dk_none:
