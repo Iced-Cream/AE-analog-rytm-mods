@@ -47,8 +47,7 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 ## Status
 
 **1.1 (core 0.12): emulator checked on the PC, not run on a unit.** Built with
-core-0.12.elemod (sha256 8b949bff...) and elekloader's core-ar2-0.12-knobs
-branch (31f87f1); the patched image verifies ("knob ids 555..559").
+elekloader's core-ar2-0.12-looks branch (core-0.12.elemod 6e5bf2fa...); the patched image verifies ("knob ids 555..559").
 - Page: FX, AMP, AMP again shows DUCK with the five knobs on A..E.
 - Value text OFF/BD../127; turns clamp (SRC at CB and OFF, DEP and ATK at 127,
   HLD at 0).
@@ -61,9 +60,15 @@ branch (31f87f1); the patched image verifies ("knob ids 555..559").
   header DUCK SOURCE .. DUCK RELEASE; gain table unchanged.
 - Knob looks (core 0.12 `core_knob_looks`): all five knobs take COMP MIX's
   look (stock id 191, which 1.0's records copied): its dial art and encoder
-  steps, DEP..REL on 0..127 and SRC on 0..12 (SRC's UI record is MIX's with
-  +8 = 12<<8, built at the first call). 1.1 is a plain 0..12 SRC again, as 1.0.
-  To be checked in the emulator on the core with knob looks (2afb6d9f...).
+  steps; DEP..REL on 0..127, SRC on 0..12 (min/max 0..12<<8, and a UI record
+  of MIX's with +8 = 12<<8, as 1.0's SRC record had, built at the first
+  call). Needs the core with the dial range (elekloader core-ar2-0.12-looks,
+  PR #12, core-0.12.elemod 6e5bf2fa...); on the first looks core SRC's dial
+  stopped near the left, as 1.0's did.
+- Emulator (PC, 1.1 e3c2711 on core 6e5bf2fa): SRC's dial runs linearly from
+  OFF (7:30) to CB (4:30), 22.5 degrees a source, one source a detent, 9
+  encoder counts a step, the same as 1.0's; DEP..REL, labels and long names
+  right; the gain table identical to 1.0's.
 - To do before this leaves draft: a unit run, and Connor's listening check.
 
 The status below is duck 1.0 on core 0.4.
