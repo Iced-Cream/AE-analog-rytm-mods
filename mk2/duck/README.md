@@ -4,7 +4,8 @@ DUCK, AE 0012, ported to the MKII as an elemod: sidechain-style pumping
 without the analog compressor. Every audio block the other voices' analog VCA
 words are scaled by a gain that dips when the key track's voice hits.
 
-With the FX track selected, press AMP (COMP) a second time for the DUCK page:
+With the FX track selected, press AMP (COMP) a second time for the DUCK page
+(1.1, core-ar2 0.10):
 
 | knob | range | what |
 |---|---|---|
@@ -14,8 +15,14 @@ With the FX track selected, press AMP (COMP) a second time for the DUCK page:
 | HLD | 0..127 | hold at full depth after a hit, 0 to 170 ms |
 | REL | 0..127 | release, 5 ms to about 2 s (time constant) |
 
-The settings are global and held in RAM: they return to the defaults (SRC OFF)
-at power-up, as on the MK1. The delay and reverb returns are not ducked.
+From 1.1 the five are saved with the kit and are the FX track's lockable
+parameters: p-locked with an FX trig held, locked in scenes, given performance
+depths, and on MIDI on the FX channel (an NRPN, MSB 4, and a CC from core's
+pool). DEP, ATK, HLD and REL are FX LFO destinations (DUCK:Duck Depth and so
+on); SRC picks a track, so it is not, and a lock on it jumps rather than
+glides. A new kit, or one saved without duck, starts at SRC OFF, DEP 90, ATK
+3, HLD 22, REL 36 (field inits). In 1.0 they were global, held in RAM, back to
+those defaults at power-up. The delay and reverb returns are not ducked.
 Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 
 ## What changed from the MK1
@@ -29,18 +36,68 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 - **Knobs.** The MKII has no spare "Error" records left once rytm2_mods is in,
   so the knobs are the hidden HH TEST machine's records 443..447, renamed. At
   the first UI tick their RAM records take the dial art and encoder feel of
-  COMP's MIX knob. The settings keep 8.8 fractions, as stock does, so turns
-  smaller than a step add up.
+  COMP's MIX knob. A turn's 8.8 fraction is kept while the kit holds its
+  whole step, so turns smaller than a step add up. From 1.1, SRC draws its
+  track's name (OFF, BD .. CB) in place of the dial, as LFO MOD draws FREE:
+  its record's draw callback takes MOD's, with duck's own drawer
+  (`dk_src_draw`, the font and centring that MOD's uses at 0x400fbe0e),
+  and MOD's first record word, so the label stays SRC while it turns.
+- **Storage and reads (1.1).** Five kit fields (`duck_src`, 4 bits,
+  `"smooth": false`; `duck_dep` .. `duck_rel`, 7 bits). Every block the engine
+  reads all five as stock would play them on the FX track (one
+  `core_param_values` call: the kit's value, the FX trig's p-lock, the scene's
+  lock, smoothed but for SRC, plus the performances and the FX LFO). SRC's
+  value text names the track from the value shown, so a held trig shows its
+  lock; the others are core's numbers.
 - **Page.** Page 14, after COMP (page 11) in the COMP view's list, through
   core-ar2 0.4's page tables (`core_pages`, `core_params`) and page-key
   lists (`core_view_pages`, order 30: after comp-preview's preview).
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.4 (its page tables).
+- 1.1 needs core-ar2 0.10 (lockable kit fields, `init`, `core_param_values`);
+  1.0 needs 0.4.
+- Kit storage: 32 bits and core's `core_fx_lfo_dst` (7), 39 of 64. fx-sends
+  1.1 needs 56, so **duck 1.1 and fx-sends 1.1 cannot be in one build**
+  ("the mods need 88 bits of kit storage"). Decided 2026-11-06: mods are
+  judged on their own where storage is the limit.
+- 1.1 linked (6 Nov 2026, elekloader 7d0bf15) alone, with cpu-probe and
+  tx-machines, and with those and all eleven rytm2_mods mods. In the
+  emulator (6 Nov 2026, core 0.10 + cpu-probe + tx-machines + duck): the
+  knobs write the kit fields, CC and NRPN reach the engine, SRC jumps, an FX
+  LFO routed to SRC does not move it, and the fields survive a power-off
+  without a save. A lock made with an FX trig held and a
+  knob turned is not stored on core 0.10, which treats ids 443..447 as the
+  FX setter's (likely locking a stock FX parameter instead); the core-ar2 fix
+  is handed over, and with it DEP's held lock stored and played in the
+  emulator. SRC draws its track name in place of the dial and follows turns
+  (emulator, 6 Nov 2026). Unchecked: scene locks, performances, the
+  read cost (well under 1% of a block for the five in one call, by
+  core-ar2's figures).
+- 1.1 on a unit (T153, 6 Nov 2026, Analog Rytm MKII, OS 1.74, core 0.10 +
+  analoghealth 1.3 + duck 1.1, flashed over fx-sends 1.1, then stock back
+  over it), each step checked on screen: the DUCK page (COMP twice on the FX
+  track) shows SRC as the text OFF in place of a dial under the label SRC;
+  SRC, DEP and HLD by their CCs on the FX channel move their knobs, SRC
+  reading BD; a new kit starts with DUCK at its defaults, and SRC BD and
+  HLD 60 are kept after saving the project, loading another and coming back.
+  Listening check: with SRC BD and DEP 90 the snare ducked audibly after each
+  BD hit, and not with SRC OFF.
+- 1.1 on a unit, second run (T156, 7 Nov 2026, same build), each step checked
+  on screen and the engine's values read back: SRC and DEP by NRPN; the FX
+  LFO on DEP sweeps it 0..127, and the ducking depth was heard changing from
+  bar to bar; an FX LFO pointed at SRC leaves SRC alone (the LFO page shows
+  ERR); a DEP lock recorded live by CC plays on its own step only; SRC, DEP
+  and HLD survive a power cycle without a save. Idle CPU 79.5-80%. Not
+  checked on the unit: trig-held locks (they need the core fix), scene locks
+  and performances (they fail in the emulator on core 0.10: the screen shows
+  the lock, but the engine keeps the base value).
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
+- Core 0.10 (6 Nov 2026): builds and links unchanged, alone, with
+  comp-preview 1.1 and with all eleven rytm2_mods mods (mk2/README.md); not
+  yet run on 0.10.
 
 ## Status
 
