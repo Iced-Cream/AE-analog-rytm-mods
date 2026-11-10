@@ -26,10 +26,12 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 - **Key.** The source voice is read from the receive buffer `0x80007440` (12
   longs a frame, voice v in slot `0x401ef480[v]`). It is refilled later in the
   block, so DUCK sees the previous block's audio: one block (0.67 ms) late.
-- **Knobs.** The MKII has no spare "Error" records left once rytm2_mods is in,
-  so the knobs are the hidden HH TEST machine's records 443..447, renamed. At
-  the first UI tick their RAM records take the dial art and encoder feel of
-  COMP's MIX knob. The settings keep 8.8 fractions, as stock does, so turns
+- **Knobs.** Mod-kept ids (core-ar2 0.13; `"knobs": 5`, the linker's `__knobs` + 0..4: 555..559 alone in a build, other ids beside other mods), with no stock record
+  behind them: `core_params` gives each knob's value, step and text, and
+  `core_param_locks` its label and name (a lock with a trig held is none: the
+  settings are global). Until duck 1.0 they were HH TEST's records 443..447;
+  core 0.13 gives HH TEST (slot 50) to mod machines, so those records are
+  no longer free. The settings keep 8.8 fractions, as stock does, so turns
   smaller than a step add up.
 - **Page.** Page 14, after COMP (page 11) in the COMP view's list, through
   core-ar2 0.4's page tables (`core_pages`, `core_params`) and page-key
@@ -37,12 +39,39 @@ Voices that two tracks share (RS/CP, MT/HT, CH/OH, CY/CB) duck together.
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.4 (its page tables).
+- Needs core-ar2 0.13 with knob looks (mod-kept ids on a page without a record; 1.0 needs 0.4 to 0.11).
 - Shares the COMP key with comp-preview 1.1: core-ar2 0.4 builds the
   COMP view's list (COMP, the preview, then DUCK), so the two link together.
 - Links with the other ten rytm2_mods v1.2 mods and the AE MKII ports.
 
 ## Status
+
+**1.1 (core 0.13): emulator checked on the PC, not run on a unit.** Built with
+elekloader's core-ar2-0.13-looks branch (core-0.12.elemod 6e5bf2fa...); the patched image verifies ("knob ids 555..559").
+- Page: FX, AMP, AMP again shows DUCK with the five knobs on A..E.
+- Value text OFF/BD../127; turns clamp (SRC at CB and OFF, DEP and ATK at 127,
+  HLD at 0).
+- Gain curve, SRC = BD, DEP 90, ATK 3, HLD 22, REL 36, SD's VCA L word:
+  identical to the 1.0 row below (12735, 3761, 3711, 4759, 6711, 9296, 11607,
+  12675); with SRC OFF it stays 12735.
+- Labels and long names: the first build drew garbage (core calls label and
+  name as C functions and reads the pointer from %a0; duck returned it in %d0
+  only). With the fix (9fd1ac4) the labels read SRC DEP ATK HLD REL and the
+  header DUCK SOURCE .. DUCK RELEASE; gain table unchanged.
+- Knob looks (core 0.13 `core_knob_looks`): all five knobs take COMP MIX's
+  look (stock id 191, which 1.0's records copied): its dial art and encoder
+  steps; DEP..REL on 0..127, SRC on 0..12 (min/max 0..12<<8, and a UI record
+  of MIX's with +8 = 12<<8, as 1.0's SRC record had, built at the first
+  call). Needs the core with the dial range (elekloader core-ar2-0.13-looks,
+  PR #12, core-0.12.elemod 6e5bf2fa...); on the first looks core SRC's dial
+  stopped near the left, as 1.0's did.
+- Emulator (PC, 1.1 e3c2711 on core 6e5bf2fa): SRC's dial runs linearly from
+  OFF (7:30) to CB (4:30), 22.5 degrees a source, one source a detent, 9
+  encoder counts a step, the same as 1.0's; DEP..REL, labels and long names
+  right; the gain table identical to 1.0's.
+- To do before this leaves draft: a unit run, and Connor's listening check.
+
+The status below is duck 1.0 on core 0.4.
 
 - Emulator (rytm-emu), core 0.4 + all eleven rytm2_mods mods (comp-preview
   1.1 included) + duck + cpu-probe: the COMP key steps COMP, preview, DUCK.

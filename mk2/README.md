@@ -14,7 +14,7 @@ page-key lists.
 | folder | MK1 mod | what | status |
 |---|---|---|---|
 | [cpu-probe](cpu-probe/README.md) | 0011 | CPU, AUDIO and PEAK readouts on the CHANNELS page | hardware |
-| [duck](duck/README.md) | 0012 | DUCK page behind COMP: VCA ducking keyed by a track | hardware |
+| [duck](duck/README.md) | 0012 | DUCK page behind COMP: VCA ducking keyed by a track | hardware (1.0, core 0.4); 1.1 for core 0.13 draft |
 | [fx-sends](fx-sends/README.md) | 0010 | FX SENDS page behind AMP: a chorus send | hardware |
 | TX machines | 0009 | not ported yet | |
 

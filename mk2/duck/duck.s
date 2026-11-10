@@ -27,14 +27,15 @@
         | once the voice fell below -48 dBFS since the last one.
         |
         | The page: page 14 after COMP (page 11) in the COMP view's list, through
-        | core-ar2 0.4's page tables. Its knobs are HH TEST's parameter records 443..447 (a hidden
-        | machine's, renamed): the MKII has none of the MK1's spare Error records
-        | left once rytm2_mods is in. The COMP view's page list is also what
+        | core-ar2's page tables. Its knobs are mod-kept ids, "knobs": 5 (core-ar2
+        | 0.13): core_params gives their values and text, core_param_locks their
+        | labels and names, and no stock record is behind them (HH TEST, slot 50,
+        | is a machine slot a mod may take from 0.13). The COMP view's page list is also what
         | comp-preview changes, so the two cannot be in one build.
 
         .equ    PAGE_COMP,      11
         .equ    PAGE_DUCK,      14
-        .equ    ID0,            443               | SRC DEP ATK HLD REL: 443..447
+        .equ    ID0,            __knobs           | SRC DEP ATK HLD REL: __knobs + 0..4 (mod.json "knobs": 5)
 
         .equ    VCA_FN,         0x40109940
         .equ    RXBUF,          0x80007440
@@ -286,44 +287,73 @@ put_u3:
         move.l  (%sp)+,%d1
         rts
 
-        | ev_tick, until done once: the five knobs' RAM records (built at boot
-        | from the records patched in mod.json) take a stock dial's encoder feel
-        | and its dial art, from COMP's MIX (id 94, 0..127); SRC's range is
-        | then 0..12. Stock gives HH TEST's records a select box for SEL, which
-        | DEP would otherwise draw as.
-        .equ    PARAM_INFO,     0x419a4888        | RAM records, 0x54 bytes an id
-        .equ    PI_STRIDE,      0x54
-        .equ    PI_DRAW,        0x24              | the draw callback, 16 B
-        .equ    ID_DONOR,       94
-        .globl  duck_tick
+        | core_param_locks: the knobs' labels and names (a pseudo id has no
+        | record to give them); a lock with a trig held is none: get and turn
+        | answer -1, set and clear 0 (the settings are global, not per step).
+        | const char *label(long id), *name(long id): 0 for another's id. The pointer
+        | is returned in %a0 as well as %d0: core calls them as C functions.
         .align  2
-duck_tick:
-        lea     dk_ready,%a0
-        tst.b   (%a0)
-        bne.s   9f
-        moveq   #1,%d0
-        move.b  %d0,(%a0)
-        lea     PARAM_INFO+ID_DONOR*PI_STRIDE,%a0
-        lea     PARAM_INFO+ID0*PI_STRIDE,%a1
-        moveq   #KNOBS,%d0
-1:      move.l  4(%a0),4(%a1)                     | the encoder's range, 8.8
-        move.l  8(%a0),8(%a1)
-        move.l  16(%a0),16(%a1)                   | its acceleration
-        move.l  PI_DRAW(%a0),PI_DRAW(%a1)         | the dial art
-        move.l  PI_DRAW+4(%a0),PI_DRAW+4(%a1)
-        move.l  PI_DRAW+8(%a0),PI_DRAW+8(%a1)
-        move.l  PI_DRAW+12(%a0),PI_DRAW+12(%a1)
-        lea     PI_STRIDE(%a1),%a1
-        subq.l  #1,%d0
-        bne.s   1b
-        move.l  #12<<8,%d0                        | SRC: 0..12
-        move.l  %d0,PARAM_INFO+ID0*PI_STRIDE+8
-9:      rts
+dk_label:
+        move.l  4(%sp),%d0
+        bsr.w   knob_of
+        bmi.s   1f
+        lea     lbl_tab,%a0
+        move.l  (%a0,%d0.l*4),%d0
+        move.l  %d0,%a0                           | C returns pointers in a0
+        rts
+1:      moveq   #0,%d0
+        sub.l   %a0,%a0
+        rts
+        .align  2
+dk_name:
+        move.l  4(%sp),%d0
+        bsr.w   knob_of
+        bmi.s   1f
+        lea     name_tab,%a0
+        move.l  (%a0,%d0.l*4),%d0
+        move.l  %d0,%a0                           | C returns pointers in a0
+        rts
+1:      moveq   #0,%d0
+        sub.l   %a0,%a0
+        rts
+        .align  2
+dk_none:
+        moveq   #-1,%d0
+        rts
+        .align  2
+dk_zero:
+        moveq   #0,%d0
+        rts
 
         | ==================================================================
         | Data
         | ==================================================================
+        | The knobs' looks, through core_knob_looks (core-ar2 0.13): COMP's MIX
+        | knob (stock id 191, which duck 1.0's records copied) for all five. SRC's
+        | UI record is MIX's with its range (+8) 0..12, built at the first call.
+        .equ    LOOK_MIX,       191
+        .align  2
+dk_src_ui:
+        lea     dk_ui,%a0
+        tst.l   (%a0)
+        bne.s   9f
+        move.l  #LOOK_MIX,-(%sp)
+        jsr     core_knob_stock_ui                | the UI record, in %a0
+        addq.l  #4,%sp
+        lea     dk_ui,%a1
+        moveq   #21,%d1                           | 84 bytes
+1:      move.l  (%a0)+,(%a1)+
+        subq.l  #1,%d1
+        bne.s   1b
+        lea     dk_ui,%a0
+        move.l  #12<<8,%d1
+        move.l  %d1,8(%a0)
+9:      lea     dk_ui,%a0
+        move.l  %a0,%d0
+        rts
+
         .align  4
+dk_ui:          .space  84
         .globl  duck_view_page
 duck_view_page: .long   8, PAGE_DUCK, 0           | core_view_pages: CORE_VIEW_COMP, always shown
         .globl  duck_page, duck_params
@@ -331,9 +361,15 @@ duck_page:      .long   PAGE_DUCK, str_page       | core_pages: {page, name, A..
                 .long   ID0, ID0+1, ID0+2, ID0+3
                 .long   ID0+4, 0, 0, 0
 duck_params:    .long   ID0, ID0+KNOBS-1, dk_get, dk_delta, dk_text  | core_params
+                .globl  duck_locks
+duck_locks:     .long   ID0, ID0+KNOBS-1, dk_none, dk_none, dk_zero, dk_zero, dk_label, dk_name
+duck_looks_src: .long   ID0, ID0, LOOK_MIX, dk_src_ui, 0, 12<<8      | core_knob_looks
+                .globl  duck_looks_src, duck_looks
+duck_looks:     .long   ID0+1, ID0+KNOBS-1, LOOK_MIX, 0, 0, 127<<8
+lbl_tab:        .long   duck_str_src, duck_str_dep, duck_str_atk, duck_str_hld, duck_str_rel
+name_tab:       .long   duck_str_src_l, duck_str_dep_l, duck_str_atk_l, duck_str_hld_l, duck_str_rel_l
 dk_state:       .long   0, 0, 1                   | env, hold, armed
 dk_acc:         .short  0, 90<<8, 3<<8, 22<<8, 36<<8  | the settings in 8.8
-dk_ready:       .byte   0
 knob_max:       .byte   12, 127, 127, 127, 127
 dk_set:         .byte   0, 90, 3, 22, 36          | SRC DEP ATK HLD REL (defaults)
 src_voice:      .byte   0, 2, 7, 7, 1, 3, 5, 5, 4, 4, 6, 6  | BD SD RS CP BT LT MT HT CH OH CY CB
@@ -341,10 +377,9 @@ src_voice:      .byte   0, 2, 7, 7, 1, 3, 5, 5, 4, 4, 6, 6  | BD SD RS CP BT LT 
         | stock map 0x401ef480 (0, 3, 1, 4, 6, 5, 7, 2)
 slot_off:       .byte   8, 20, 12, 24, 32, 28, 36, 16
 src_names:      .ascii  "OFF\0BD\0\0SD\0\0RS\0\0CP\0\0BT\0\0LT\0\0MT\0\0HT\0\0CH\0\0OH\0\0CY\0\0CB\0\0"
-        .globl  duck_str_group, duck_str_src_l, duck_str_src, duck_str_dep_l, duck_str_dep
+        .globl  duck_str_src_l, duck_str_src, duck_str_dep_l, duck_str_dep
         .globl  duck_str_atk_l, duck_str_atk, duck_str_hld_l, duck_str_hld, duck_str_rel_l, duck_str_rel
 str_page:       .asciz  "DUCK"
-duck_str_group: .asciz  "DUCK"
 duck_str_src_l: .asciz  "Duck Source"
 duck_str_src:   .asciz  "SRC"
 duck_str_dep_l: .asciz  "Duck Depth"
