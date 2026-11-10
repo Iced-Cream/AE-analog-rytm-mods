@@ -54,7 +54,7 @@ the tail has died (about 3 s).
   in mod.json; the first is the symbol `__knobs`, 555 or above, steady through
   the lockfile; needs elekloader with the knob allocation, PR #11), answered through `core_params` and named by a
   `core_param_locks` entry (label and name only; no locks are kept). Until 1.0
-  they were the hidden CY TEST machine's records 449..456; core-ar2 0.12 offers
+  they were the hidden CY TEST machine's records 449..456; core-ar2 0.13 offers
   that machine's slot (51) to mod machines, so this mod no longer touches those
   records and declares no `machine:51`. The global settings keep 8.8 fractions;
   CHR keeps one fraction, for the track it was last turned on.
@@ -64,7 +64,7 @@ the tail has died (about 3 s).
 
 ## Needs and conflicts
 
-- Needs core-ar2 0.12 (declared `"core": "0.12"`): its page tables and mod-kept ids.
+- Needs core-ar2 0.13 (declared `"core": "0.13"`): its page tables and mod-kept ids.
 - Uses 7 bits of core-ar2's 56-bit sound storage. voice-dac (39) and lfo-rnd
   (16) use 55, so **fx-sends cannot be in a build with both of them**; the
   patcher refuses that build ("the mods need 62 bits of sound storage"). It
@@ -76,7 +76,7 @@ the tail has died (about 3 s).
 
 ## Status
 
-**1.1 (core 0.12): built from source only, not yet built, run in the emulator or
+**1.1 (core 0.13): built from source only, not yet built, run in the emulator or
 tried on a unit.** The knob move (CY TEST records 449..456 to `__knobs` + 0..7) is
 untested; to check in the emulator: the page shows with the same labels and
 header names, every knob turns over 0..127 with the feel it had (the knobs no

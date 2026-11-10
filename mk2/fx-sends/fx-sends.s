@@ -39,7 +39,7 @@
         | The page: page 15 after AMP (page 7) in the AMP view's list, through
         | core-ar2 0.4's page tables. Its knobs are ids __knobs + 0..7 (the linker gives them, from 555 up), kept by the mod itself
         | through core-ar2 0.11's core_params and core_param_locks (a label and a name
-        | for each); they use no machine's parameter records (core 0.12 gives the TEST
+        | for each); they use no machine's parameter records (core 0.13 gives the TEST
         | machines' slots 44..52 to mod machines).
         |
         | Memory: the line and buffers are this mod's .bss (8.5 KB), not raw DRAM.
