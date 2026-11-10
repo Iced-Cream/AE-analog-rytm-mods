@@ -5,7 +5,7 @@
  "category": "Sound",
  "author": "hugz202 (AE-analog-rytm-mods); MKII port: Iced-Cream",
  "license": "MIT",
- "description": "Sidechain-style pumping without the analog compressor: every audio block the other voices' analog VCA words are scaled by a gain that dips when the key track's voice hits. FX track, AMP (COMP) pressed twice: the DUCK page, SRC (OFF or the key track), DEP, ATK, HLD, REL. Global settings held in RAM (SRC OFF at power-up). The key is the source voice's own audio as the codec captured it, one block late; the delay and reverb returns are not ducked. Its knobs are mod-kept ids the linker gives it (5 knobs, core-ar2 0.12), with no stock record behind them, drawn with COMP MIX's look (core-ar2 0.12 knob looks). Needs core-ar2 0.12. Cannot share a build with comp-preview, which changes the same COMP page list. Port of AE-analog-rytm-mods 0012-duck (Analog Rytm MK1).",
+ "description": "Sidechain-style pumping without the analog compressor: every audio block the other voices' analog VCA words are scaled by a gain that dips when the key track's voice hits. FX track, AMP (COMP) pressed twice: the DUCK page, SRC (OFF or the key track), DEP, ATK, HLD, REL. Global settings held in RAM (SRC OFF at power-up). The key is the source voice's own audio as the codec captured it, one block late; the delay and reverb returns are not ducked. Its knobs are mod-kept ids the linker gives it (5 knobs, core-ar2 0.13), with no stock record behind them, drawn with COMP MIX's look (core-ar2 0.13 knob looks). Needs core-ar2 0.13. Cannot share a build with comp-preview, which changes the same COMP page list. Port of AE-analog-rytm-mods 0012-duck (Analog Rytm MK1).",
  "device": "analog-rytm-mk2",
  "os": "1.74",
  "sources": [
@@ -103,7 +103,7 @@
   "core"
  ],
  "resources": {
-  "core": "0.12"
+  "core": "0.13"
  },
  "knobs": 5
 }

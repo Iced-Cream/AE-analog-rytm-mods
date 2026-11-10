@@ -28,9 +28,9 @@
         |
         | The page: page 14 after COMP (page 11) in the COMP view's list, through
         | core-ar2's page tables. Its knobs are mod-kept ids, "knobs": 5 (core-ar2
-        | 0.12): core_params gives their values and text, core_param_locks their
+        | 0.13): core_params gives their values and text, core_param_locks their
         | labels and names, and no stock record is behind them (HH TEST, slot 50,
-        | is a machine slot a mod may take from 0.12). The COMP view's page list is also what
+        | is a machine slot a mod may take from 0.13). The COMP view's page list is also what
         | comp-preview changes, so the two cannot be in one build.
 
         .equ    PAGE_COMP,      11
@@ -328,7 +328,7 @@ dk_zero:
         | ==================================================================
         | Data
         | ==================================================================
-        | The knobs' looks, through core_knob_looks (core-ar2 0.12): COMP's MIX
+        | The knobs' looks, through core_knob_looks (core-ar2 0.13): COMP's MIX
         | knob (stock id 191, which duck 1.0's records copied) for all five. SRC's
         | UI record is MIX's with its range (+8) 0..12, built at the first call.
         .equ    LOOK_MIX,       191
